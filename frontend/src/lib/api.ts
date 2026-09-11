@@ -326,7 +326,8 @@ export async function getBackendOrder(
       } catch {}
     }
 
-    const url = new URL(`${API_BASE_URL}/orders/${encodeURIComponent(cleanNum)}`);
+    const base = typeof window !== "undefined" ? window.location.origin : "http://localhost";
+    const url = new URL(`${API_BASE_URL}/orders/${encodeURIComponent(cleanNum)}`, base);
     const headers: Record<string, string> = { Accept: "application/json" };
 
     if (!skipToken && token) {

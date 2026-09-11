@@ -271,7 +271,8 @@ export default function AdminOrders() {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const url = new URL(`${API_BASE_URL}/admin/orders`);
+      const base = typeof window !== "undefined" ? window.location.origin : "http://localhost";
+      const url = new URL(`${API_BASE_URL}/admin/orders`, base);
       if (statusFilter !== "all") url.searchParams.set("status", statusFilter);
       if (searchQuery.trim()) url.searchParams.set("search", searchQuery.trim());
 
