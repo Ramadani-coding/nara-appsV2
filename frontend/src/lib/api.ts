@@ -112,9 +112,9 @@ export interface PremkuBalanceData {
 export async function fetchPremkuBalance(): Promise<PremkuBalanceData> {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
 
-    const res = await fetch(`${API_BASE_URL}/premku/balance`, {
+    const res = await adminFetch("/premku/balance", {
       signal: controller.signal,
       headers: { Accept: 'application/json' },
     });
@@ -137,7 +137,7 @@ export async function fetchPremkuBalance(): Promise<PremkuBalanceData> {
     // Backend offline or network switch
   }
 
-  // Fallback ke cache localStorage
+  // Fallback ke cache localStorage jika ada data sebelumnya
   try {
     const cached = localStorage.getItem('nara_premku_saldo');
     if (cached !== null) {
@@ -148,8 +148,8 @@ export async function fetchPremkuBalance(): Promise<PremkuBalanceData> {
     }
   } catch {}
 
-  // Fallback default: Saldo riil akun Premku saat ini (Rp 167)
-  return { saldo: 167, cached: true };
+  // Fallback default jika belum ada data atau gagal memuat
+  return { saldo: 0, cached: true };
 }
 
 /**

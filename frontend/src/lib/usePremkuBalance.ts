@@ -24,8 +24,8 @@ export function usePremkuBalance() {
       }
     } catch {}
 
-    // 3. Default fallback saldo aktual Premku
-    return { saldo: 167, cached: true };
+    // 3. Default fallback jika belum ada data
+    return { saldo: 0, cached: true };
   });
 
   const [loading, setLoading] = useState(true);
