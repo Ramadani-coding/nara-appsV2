@@ -1,0 +1,74 @@
+services:
+  # ==========================================
+  # Service 1: Backend API (Node.js Express)
+  # ==========================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nara-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      - PORT=5001
+      - NODE_ENV=production
+    networks:
+      - nara-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:5001/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ==========================================
+  # Service 2: Frontend & Reverse Proxy (Nginx)
+  # ==========================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-}
+    container_name: nara-frontend
+    restart: unless-stopped
+    ports:
+      # Port host yang diexpose (default 80, bisa disesuaikan via .env PORT=80)
+      - "${APP_PORT:-80}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - nara-network
+
+  # ==========================================
+  # Service 3: PostgreSQL Lokal (Opsional)
+  # Diaktifkan hanya jika ingin menggunakan database lokal di VPS
+  # daripada Supabase Cloud (Jalankan: docker compose --profile db up -d)
+  # ==========================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: nara-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-nara_digital}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - nara-network
+    profiles:
+      - db
+
+networks:
+  nara-network:
+    driver: bridge
+    name: nara-network
+
+volumes:
+  postgres_data:
+    driver: local
