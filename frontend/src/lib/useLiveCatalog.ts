@@ -255,12 +255,20 @@ class CatalogStore {
         foundPackage.price = price;
         hasChanged = true;
       }
+      if (stockCount !== undefined && !isNaN(stockCount) && foundPackage.stockCount !== stockCount) {
+        foundPackage.stockCount = stockCount;
+        foundPackage.stockBadge = stockCount > 0 ? `ADA ${stockCount}` : 'HABIS';
+        hasChanged = true;
+      }
       if (maxAllowedQty !== undefined) {
         const clampedMax = Math.min(foundPackage.stockCount, maxAllowedQty);
         if (foundPackage.maxAllowedQty !== clampedMax) {
           foundPackage.maxAllowedQty = clampedMax;
           hasChanged = true;
         }
+      } else if (foundPackage.maxAllowedQty !== undefined && foundPackage.maxAllowedQty > foundPackage.stockCount) {
+        foundPackage.maxAllowedQty = foundPackage.stockCount;
+        hasChanged = true;
       }
       if (isMaintenance !== undefined && foundPackage.isMaintenance !== isMaintenance) {
         foundPackage.isMaintenance = isMaintenance;
@@ -274,14 +282,6 @@ class CatalogStore {
       }
       if (originalPrice !== undefined && originalPrice !== null && Number(originalPrice) > 0) {
         foundPackage.originalPrice = Number(originalPrice);
-      }
-      if (stockCount !== undefined && !isNaN(stockCount) && foundPackage.stockCount !== stockCount) {
-        foundPackage.stockCount = stockCount;
-        foundPackage.stockBadge = stockCount > 0 ? `ADA ${stockCount}` : 'HABIS';
-        if (foundPackage.maxAllowedQty !== undefined && foundPackage.maxAllowedQty > stockCount) {
-          foundPackage.maxAllowedQty = stockCount;
-        }
-        hasChanged = true;
       }
       if (description) {
         foundPackage.description = description;

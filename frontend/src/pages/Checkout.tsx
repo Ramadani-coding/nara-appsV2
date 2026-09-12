@@ -51,9 +51,11 @@ export default function Checkout() {
   const maxAllowedQty = selectedPackage && !isOutOfStock && !isSelectedPkgMaintenance
     ? Math.min(
         selectedPackage.stockCount,
-        selectedPackage.maxAllowedQty !== undefined && selectedPackage.maxAllowedQty > 0
+        selectedPackage.maxAllowedQty !== undefined
           ? selectedPackage.maxAllowedQty
-          : (getMaxAllowedQty(selectedModalPrice, selectedPackage.stockCount) || selectedPackage.stockCount)
+          : (selectedPackage.providerPrice
+              ? (getMaxAllowedQty(selectedPackage.providerPrice, selectedPackage.stockCount) || selectedPackage.stockCount)
+              : selectedPackage.stockCount)
       )
     : 0;
 

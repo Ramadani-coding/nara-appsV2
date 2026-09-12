@@ -529,11 +529,12 @@ export let SERVICES: ServiceProduct[] = [
         name: "Netflix Sharing 20D+ 1P2U",
         type: "Sharing",
         duration: "20 Hari+",
-        stockCount: 0,
-        stockBadge: "HABIS",
+        stockCount: 7,
+        stockBadge: "ADA 7",
         discountPercent: 89,
         originalPrice: 189000,
-        price: 20500,
+        price: 25000,
+        maxAllowedQty: 2,
         description: "1 Profile sharing 2 user, legal payment, login via kode ke admin.",
         imageUrl: "https://cdn.premku.com/img/nv.png"
       }
