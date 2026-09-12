@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, ShoppingCart, Tag, X } from 'lucide-react';
-import { SERVICES } from '../lib/mockData';
+import { useLiveServices } from '../lib/useLiveCatalog';
 import { AppLogo } from './AppLogo';
 
 interface FlatPriceItem {
@@ -19,11 +19,12 @@ interface FlatPriceItem {
 export function PriceListSection() {
   const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
+  const liveServices = useLiveServices();
 
   // Flatten all packages across all services into a price list
   const allItems: FlatPriceItem[] = useMemo(() => {
     const list: FlatPriceItem[] = [];
-    SERVICES.forEach(service => {
+    liveServices.forEach(service => {
       service.packages.forEach(pkg => {
         list.push({
           id: pkg.id,
@@ -39,7 +40,7 @@ export function PriceListSection() {
       });
     });
     return list;
-  }, []);
+  }, [liveServices]);
 
   const filteredItems = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();

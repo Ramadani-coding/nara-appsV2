@@ -152,6 +152,22 @@ export let SERVICES: ServiceProduct[] = [
     description: "Akses semua fitur CapCut Pro resmi: auto-caption otomatis, ekspor resolusi 4K tanpa watermark, efek filter AI viral, dan cloud storage khusus editing.",
     packages: [
       {
+        id: "capcut-3-6d-random",
+        providerId: 14,
+        serviceId: "capcut",
+        serviceName: "CapCut Pro",
+        name: "Capcut Pro 3-6 Hari Random",
+        type: "Sharing",
+        duration: "3-6 Hari",
+        stockCount: 11,
+        stockBadge: "ADA 11",
+        discountPercent: 99,
+        originalPrice: 2345672,
+        price: 7000,
+        description: "Random aktifnya 3-6 hari no komplen.",
+        imageUrl: "https://cdn.premku.com/img/capcut.png"
+      },
+      {
         id: "capcut-1w-private",
         providerId: 4,
         serviceId: "capcut",
@@ -616,6 +632,38 @@ export let SERVICES: ServiceProduct[] = [
         price: 27000,
         description: "VIDIO MOBILE khusus HP / Tablet. Jangan ganti nomor HP di akun agar garansi tetap berlaku.",
         imageUrl: "https://cdn.premku.com/img/vidio.png"
+      }
+    ]
+  },
+  {
+    id: "iqiyi",
+    name: "iQIYI Premium",
+    category: "Musik & Video",
+    categorySlug: "musik-video",
+    tagline: "Mulai Rp 3.700",
+    badge: "HOT",
+    badgeColor: "emerald",
+    iconId: "iqiyi",
+    imageUrl: "https://cdn.premku.com/img/iqw.png",
+    genreTag: "STREAMING",
+    accountTypeTag: "VIP & Sharing",
+    description: "Nonton drama Asia, anime, variety show, dan serial eksklusif iQIYI subtitle Indonesia tanpa iklan dengan kualitas Full HD hingga 4K.",
+    packages: [
+      {
+        id: "iqiyi-2w-sharing",
+        providerId: 155,
+        serviceId: "iqiyi",
+        serviceName: "iQIYI Premium",
+        name: "IQIYI Premium Sharing 2 Minggu",
+        type: "Sharing",
+        duration: "2 Minggu",
+        stockCount: 7,
+        stockBadge: "ADA 7",
+        discountPercent: 97,
+        originalPrice: 135343,
+        price: 3700,
+        description: "PLAN PREMIUM SHARING 2 Mingguan, GARANSI 3 HARI",
+        imageUrl: "https://cdn.premku.com/img/iqw.png"
       }
     ]
   }

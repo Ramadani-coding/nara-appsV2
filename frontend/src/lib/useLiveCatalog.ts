@@ -25,6 +25,131 @@ export function computeServiceTagline(service: ServiceProduct): string {
   return `Mulai Rp ${minPrice.toLocaleString('id-ID')}`;
 }
 
+/**
+ * Mendeteksi ID service berdasarkan nama produk
+ */
+function detectServiceIdForProduct(name: string): string {
+  const n = name.toLowerCase().trim();
+  if (n.includes('capcut')) return 'capcut';
+  if (n.includes('canva')) return 'canva';
+  if (n.includes('alight')) return 'alight-motion';
+  if (n.includes('netflix')) return 'netflix';
+  if (n.includes('spotify')) return 'spotify';
+  if (n.includes('prime')) return 'prime-video';
+  if (n.includes('youtube')) return 'youtube';
+  if (n.includes('viu')) return 'viu';
+  if (n.includes('vidio') || n.includes('vd mobile')) return 'vidio';
+  if (n.includes('disney')) return 'disney';
+  if (n.includes('drama') || n.includes('wetv') || n.includes('dracin')) return 'akses-drama';
+  if (n.includes('wink')) return 'wink';
+  if (n.includes('hma') || n.includes('vpn')) return 'hma-vpn';
+  if (n.includes('gemini') || n.includes('chatgpt') || n.includes('gpt') || n.includes('claude')) return 'aplikasi-ai';
+  if (n.includes('iqiyi') || n.includes('iqw')) return 'iqiyi';
+
+  const firstWord = n.split(/[\s_-]+/)[0].replace(/[^a-z0-9]/g, '');
+  return firstWord || 'lainnya';
+}
+
+function createServiceForProduct(serviceId: string, rawItem: any): ServiceProduct {
+  const rawName = String(rawItem.name || '');
+  let serviceName = rawName.split(/[\s_-]+/)[0];
+  if (serviceId === 'iqiyi') serviceName = 'iQIYI Premium';
+
+  const categoryName = rawItem.category?.name || '';
+  let category: 'Desain' | 'Musik & Video' | 'Lainnya' = 'Musik & Video';
+  let categorySlug: 'desain' | 'musik-video' | 'lainnya' = 'musik-video';
+
+  const catLower = (categoryName || '').toLowerCase();
+  if (catLower.includes('desain') || catLower.includes('kreatif')) {
+    category = 'Desain';
+    categorySlug = 'desain';
+  } else if (catLower.includes('ai') || catLower.includes('vpn') || catLower.includes('utilitas') || catLower.includes('lainnya')) {
+    category = 'Lainnya';
+    categorySlug = 'lainnya';
+  }
+
+  return {
+    id: serviceId,
+    name: serviceName,
+    category,
+    categorySlug,
+    tagline: `Mulai Rp ${(rawItem.price || 0).toLocaleString('id-ID')}`,
+    badge: 'HOT',
+    badgeColor: 'emerald',
+    iconId: serviceId,
+    imageUrl: rawItem.imageUrl || rawItem.image_url || undefined,
+    genreTag: category === 'Desain' ? 'DESAIN' : category === 'Lainnya' ? 'PRODUKTIVITAS' : 'STREAMING',
+    accountTypeTag: 'VIP & Premium',
+    description: rawItem.description || `Layanan langganan premium ${serviceName} resmi, aktif instan dan bergaransi penuh.`,
+    packages: [],
+    isActive: true,
+  };
+}
+
+function createPackageFromRaw(rawItem: any, service: ServiceProduct): ProductPackage {
+  const provId = rawItem.providerServiceId ?? rawItem.provider_service_id ?? rawItem.providerId;
+  const rawId = rawItem.id ? String(rawItem.id) : (provId ? String(provId) : `pkg-${Date.now()}`);
+  const name = String(rawItem.name || 'Paket');
+  const price = typeof rawItem.price === 'number' ? rawItem.price : Number(rawItem.price) || 0;
+  const originalPrice = Number(rawItem.originalPrice ?? rawItem.original_price) || Math.round(price * 2.5);
+  const stockCount = typeof rawItem.stockCount === 'number' 
+    ? rawItem.stockCount 
+    : typeof rawItem.stock_count === 'number' 
+    ? rawItem.stock_count 
+    : 0;
+  const providerPrice = Number(rawItem.providerPrice ?? rawItem.provider_price) || price;
+  const marginValue = Number(rawItem.marginValue ?? rawItem.margin_value) || 0;
+  const maxAllowedQty = typeof rawItem.maxAllowedQty === 'number' 
+    ? Math.min(stockCount, rawItem.maxAllowedQty) 
+    : stockCount;
+  const isMaintenance = typeof rawItem.isMaintenance === 'boolean' ? rawItem.isMaintenance : undefined;
+  const rawActive = rawItem.isActive ?? rawItem.is_active;
+  const isActive = typeof rawActive === 'boolean' ? rawActive : true;
+
+  const lowerName = name.toLowerCase();
+  let type: 'Privat' | 'Sharing' | 'Invite' | 'Head' | 'Family' = 'Privat';
+  if (lowerName.includes('sharing') || lowerName.includes('random')) type = 'Sharing';
+  else if (lowerName.includes('invite')) type = 'Invite';
+  else if (lowerName.includes('head')) type = 'Head';
+  else if (lowerName.includes('family')) type = 'Family';
+
+  let duration = '1 Bulan';
+  const durationMatch = name.match(/(\d+(?:[-]\d+)?\s*(?:hari|bulan|minggu|tahun|d|m|y)\+?)/i);
+  if (durationMatch) {
+    duration = durationMatch[1];
+  } else if (lowerName.includes('lifetime')) {
+    duration = 'Lifetime';
+  }
+
+  const discountPercent = originalPrice > price 
+    ? Math.min(99, Math.max(1, Math.round(((originalPrice - price) / originalPrice) * 100))) 
+    : undefined;
+
+  const pkgId = `${service.id}-${provId || rawId}`;
+
+  return {
+    id: pkgId,
+    providerId: provId ? Number(provId) : undefined,
+    serviceId: service.id,
+    serviceName: service.name,
+    name,
+    type,
+    duration,
+    stockCount,
+    stockBadge: stockCount > 0 ? `ADA ${stockCount}` : 'HABIS',
+    discountPercent,
+    originalPrice,
+    providerPrice,
+    marginValue,
+    price,
+    description: rawItem.description || '',
+    imageUrl: rawItem.imageUrl || rawItem.image_url || service.imageUrl,
+    isActive,
+    isMaintenance,
+    maxAllowedQty,
+  };
+}
+
 class CatalogStore {
   private services: ServiceProduct[] = [];
   private listeners: Set<() => void> = new Set();
@@ -102,62 +227,95 @@ class CatalogStore {
     const isMaintenance = typeof rawItem.isMaintenance === 'boolean' ? rawItem.isMaintenance : undefined;
 
     let hasChanged = false;
+    let foundPackage: ProductPackage | null = null;
+    let foundService: ServiceProduct | null = null;
 
+    // 1. Cari apakah paket ini sudah ada di salah satu service
     for (const service of this.services) {
       for (const pkg of service.packages) {
         const matchesProvider = providerServiceId && String(pkg.providerId) === providerServiceId;
         const matchesName = name && pkg.name.toLowerCase().trim() === name;
 
         if (matchesProvider || matchesName) {
-          if (isActive !== undefined && pkg.isActive !== isActive) {
-            pkg.isActive = isActive;
-            hasChanged = true;
-          }
-          if (!isNaN(price) && price > 0 && pkg.price !== price) {
-            pkg.price = price;
-            hasChanged = true;
-          }
-          if (maxAllowedQty !== undefined && pkg.maxAllowedQty !== maxAllowedQty) {
-            pkg.maxAllowedQty = maxAllowedQty;
-            hasChanged = true;
-          }
-          if (isMaintenance !== undefined && pkg.isMaintenance !== isMaintenance) {
-            pkg.isMaintenance = isMaintenance;
-            hasChanged = true;
-          }
-          if (providerPrice !== undefined && providerPrice !== null && !isNaN(Number(providerPrice)) && Number(providerPrice) > 0) {
-            pkg.providerPrice = Number(providerPrice);
-          }
-          if (marginValue !== undefined && marginValue !== null && !isNaN(Number(marginValue))) {
-            pkg.marginValue = Number(marginValue);
-          }
-          if (originalPrice !== undefined && originalPrice !== null && Number(originalPrice) > 0) {
-            pkg.originalPrice = Number(originalPrice);
-          }
-          if (stockCount !== undefined && !isNaN(stockCount) && pkg.stockCount !== stockCount) {
-            pkg.stockCount = stockCount;
-            pkg.stockBadge = stockCount > 0 ? `ADA ${stockCount}` : 'HABIS';
-            hasChanged = true;
-          }
-          if (description) {
-            pkg.description = description;
-          }
-          if (imageUrl) {
-            pkg.imageUrl = imageUrl;
-          }
+          foundPackage = pkg;
+          foundService = service;
+          break;
         }
       }
-      
-      const activePackages = service.packages.filter(p => p.isActive !== false);
+      if (foundPackage) break;
+    }
+
+    if (foundPackage && foundService) {
+      // Update paket yang sudah ada
+      if (isActive !== undefined && foundPackage.isActive !== isActive) {
+        foundPackage.isActive = isActive;
+        hasChanged = true;
+      }
+      if (!isNaN(price) && price > 0 && foundPackage.price !== price) {
+        foundPackage.price = price;
+        hasChanged = true;
+      }
+      if (maxAllowedQty !== undefined) {
+        const clampedMax = Math.min(foundPackage.stockCount, maxAllowedQty);
+        if (foundPackage.maxAllowedQty !== clampedMax) {
+          foundPackage.maxAllowedQty = clampedMax;
+          hasChanged = true;
+        }
+      }
+      if (isMaintenance !== undefined && foundPackage.isMaintenance !== isMaintenance) {
+        foundPackage.isMaintenance = isMaintenance;
+        hasChanged = true;
+      }
+      if (providerPrice !== undefined && providerPrice !== null && !isNaN(Number(providerPrice)) && Number(providerPrice) > 0) {
+        foundPackage.providerPrice = Number(providerPrice);
+      }
+      if (marginValue !== undefined && marginValue !== null && !isNaN(Number(marginValue))) {
+        foundPackage.marginValue = Number(marginValue);
+      }
+      if (originalPrice !== undefined && originalPrice !== null && Number(originalPrice) > 0) {
+        foundPackage.originalPrice = Number(originalPrice);
+      }
+      if (stockCount !== undefined && !isNaN(stockCount) && foundPackage.stockCount !== stockCount) {
+        foundPackage.stockCount = stockCount;
+        foundPackage.stockBadge = stockCount > 0 ? `ADA ${stockCount}` : 'HABIS';
+        if (foundPackage.maxAllowedQty !== undefined && foundPackage.maxAllowedQty > stockCount) {
+          foundPackage.maxAllowedQty = stockCount;
+        }
+        hasChanged = true;
+      }
+      if (description) {
+        foundPackage.description = description;
+      }
+      if (imageUrl) {
+        foundPackage.imageUrl = imageUrl;
+      }
+    } else if (rawItem.name) {
+      // 2. PRODUK BARU! Belum ada di mockData. Temukan atau buat service yang sesuai
+      const serviceId = detectServiceIdForProduct(String(rawItem.name));
+      let targetService = this.services.find(s => s.id === serviceId);
+
+      if (!targetService) {
+        targetService = createServiceForProduct(serviceId, rawItem);
+        this.services.push(targetService);
+      }
+
+      const newPkg = createPackageFromRaw(rawItem, targetService);
+      targetService.packages.push(newPkg);
+      foundService = targetService;
+      hasChanged = true;
+    }
+
+    if (foundService) {
+      const activePackages = foundService.packages.filter(p => p.isActive !== false);
       const shouldServiceBeActive = activePackages.length > 0;
-      if (service.isActive !== shouldServiceBeActive) {
-        service.isActive = shouldServiceBeActive;
+      if (foundService.isActive !== shouldServiceBeActive) {
+        foundService.isActive = shouldServiceBeActive;
         hasChanged = true;
       }
 
-      const newTagline = computeServiceTagline(service);
-      if (service.tagline !== newTagline) {
-        service.tagline = newTagline;
+      const newTagline = computeServiceTagline(foundService);
+      if (foundService.tagline !== newTagline) {
+        foundService.tagline = newTagline;
         hasChanged = true;
       }
     }

@@ -3,7 +3,6 @@ import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useLiveService } from '../lib/useLiveCatalog';
 import { usePremkuBalance } from '../lib/usePremkuBalance';
-import { MaintenanceTooltip } from '../components/MaintenanceTooltip';
 import { 
   ArrowLeft, 
   ShieldCheck, 
@@ -33,9 +32,7 @@ export default function Checkout() {
   const initialPackageId = searchParams.get('package');
   const service = useLiveService(id || '');
   
-  const [selectedPackageId, setSelectedPackageId] = useState<string>(
-    initialPackageId || service?.packages[0]?.id || ''
-  );
+  const selectedPackageId = initialPackageId || service?.packages[0]?.id || '';
 
   const { isMaintenance, getMaxAllowedQty } = usePremkuBalance();
 
@@ -49,11 +46,15 @@ export default function Checkout() {
     ? (selectedPackage.isMaintenance !== undefined ? selectedPackage.isMaintenance : isMaintenance(selectedModalPrice))
     : false;
 
-  // Batasi kuantitas maksimum berdasarkan stok dan saldo modal akun Premku
+  // Batasi kuantitas maksimum: TIDAK BOLEH melebihi stok yang tersedia (stockCount)
+  // dan juga dibatasi oleh saldo modal akun Premku jika berlaku
   const maxAllowedQty = selectedPackage && !isOutOfStock && !isSelectedPkgMaintenance
-    ? (selectedPackage.maxAllowedQty !== undefined
-        ? selectedPackage.maxAllowedQty
-        : getMaxAllowedQty(selectedModalPrice, selectedPackage.stockCount))
+    ? Math.min(
+        selectedPackage.stockCount,
+        selectedPackage.maxAllowedQty !== undefined && selectedPackage.maxAllowedQty > 0
+          ? selectedPackage.maxAllowedQty
+          : (getMaxAllowedQty(selectedModalPrice, selectedPackage.stockCount) || selectedPackage.stockCount)
+      )
     : 0;
 
   const [phone, setPhone] = useState('');
@@ -70,18 +71,20 @@ export default function Checkout() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Otomatis sinkronkan kuantitas agar tidak melebihi saldo akun Premku
+  // Otomatis sinkronkan kuantitas agar tidak melebihi stok / saldo akun Premku
   useEffect(() => {
-    if (maxAllowedQty > 0) {
+    if (isOutOfStock || isSelectedPkgMaintenance) {
+      setQuantity(0);
+    } else if (maxAllowedQty > 0) {
       if (quantity > maxAllowedQty) {
         setQuantity(maxAllowedQty);
       } else if (quantity < 1) {
         setQuantity(1);
       }
     } else {
-      setQuantity(0);
+      setQuantity(1);
     }
-  }, [maxAllowedQty, selectedPackageId]);
+  }, [maxAllowedQty, isOutOfStock, isSelectedPkgMaintenance, selectedPackageId]);
 
   // Hanya perbolehkan angka (0-9) dan bersihkan karakter lain + validasi lokal instan
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -164,7 +167,10 @@ export default function Checkout() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isOutOfStock || isSelectedPkgMaintenance || isSubmitting) return;
-    if (quantity > maxAllowedQty || quantity < 1) return;
+    if (quantity > maxAllowedQty || quantity > selectedPackage.stockCount || quantity < 1) {
+      setSubmitError(`Kuantitas pembelian tidak boleh melebihi stok yang tersedia (${selectedPackage.stockCount} unit).`);
+      return;
+    }
 
     if (!phone.trim()) {
       setSubmitError('Nomor WhatsApp wajib diisi.');
@@ -296,82 +302,7 @@ export default function Checkout() {
           )}
         </div>
 
-        {/* Multi-package Switcher if Service has multiple packages */}
-        {service.packages.length > 1 && (
-          <div className="space-y-2 pt-1">
-            <label className="text-xs font-black uppercase text-black dark:text-white tracking-wide flex items-center justify-between">
-              <span>Pilihan Paket {service.name}:</span>
-              <span className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">{service.packages.length} varian</span>
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {service.packages.map((pkg) => {
-                const pkgOutOfStock = pkg.stockCount <= 0;
-                const pkgModalPrice = pkg.providerPrice || pkg.price;
-                const pkgMaintenance = !pkgOutOfStock && isMaintenance(pkgModalPrice);
-                const isOptionDisabled = pkgOutOfStock || pkgMaintenance;
-                const isSelected = pkg.id === selectedPackage.id;
 
-                return (
-                  <MaintenanceTooltip
-                    key={pkg.id}
-                    isActive={pkgMaintenance}
-                    message="Varian paket ini sedang dalam masa pemeliharaan sistem (maintenance)."
-                    className="w-full"
-                  >
-                    <button
-                      type="button"
-                      disabled={isOptionDisabled}
-                      onClick={() => {
-                        if (!isOptionDisabled) setSelectedPackageId(pkg.id);
-                      }}
-                      className={`w-full p-3 text-left border-2 rounded-xl transition-all relative ${
-                        pkgOutOfStock
-                          ? 'opacity-40 grayscale bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-700 cursor-not-allowed pointer-events-none'
-                          : pkgMaintenance
-                          ? 'bg-amber-50/50 dark:bg-amber-950/20 border-amber-400 dark:border-amber-700 cursor-not-allowed'
-                          : isSelected
-                          ? 'bg-brand-blue-soft/50 dark:bg-brand-blue/20 border-brand-blue shadow-[3px_3px_0px_#000] cursor-pointer'
-                          : 'bg-white dark:bg-[#1E2333] border-black dark:border-gray-700 hover:border-brand-blue shadow-[2px_2px_0px_#000] cursor-pointer neo-btn'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-1 mb-1">
-                        <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded border ${
-                          pkgOutOfStock 
-                            ? 'bg-rose-100 text-rose-700 border-rose-300' 
-                            : pkgMaintenance
-                            ? 'bg-amber-100 text-amber-900 border-amber-400 flex items-center gap-1'
-                            : 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                        }`}>
-                          {pkgOutOfStock ? (
-                            'HABIS'
-                          ) : pkgMaintenance ? (
-                            <>
-                              <Wrench className="w-2.5 h-2.5 text-amber-700 shrink-0" />
-                              <span>MAINTENANCE</span>
-                            </>
-                          ) : (
-                            `READY (${pkg.stockCount})`
-                          )}
-                        </span>
-                        <span className={`text-xs font-black ${
-                          pkgMaintenance ? 'text-gray-500' : 'text-brand-blue dark:text-cyan-400'
-                        }`}>
-                          Rp {pkg.price.toLocaleString('id-ID')}
-                        </span>
-                      </div>
-                      <h4 className="font-extrabold text-xs text-black dark:text-white line-clamp-1">
-                        {pkg.name}
-                      </h4>
-                      <span className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold block mt-0.5">
-                        {pkg.type} • {pkg.duration}
-                      </span>
-                    </button>
-                  </MaintenanceTooltip>
-                );
-              })}
-            </div>
-          </div>
-        )}
 
         {/* Selected Product Highlight Box / Card */}
         <div className={`p-3.5 sm:p-4 border-2 rounded-2xl flex flex-col gap-3.5 transition-all relative overflow-hidden ${

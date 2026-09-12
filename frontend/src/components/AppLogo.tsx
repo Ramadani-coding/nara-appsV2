@@ -120,6 +120,13 @@ export function AppLogo({ id, className = "w-16 h-16", imageUrl }: AppLogoProps)
         </div>
       );
 
+    case 'iqiyi':
+      return (
+        <div className={`${className} bg-[#00C234] rounded-xl sm:rounded-2xl flex flex-col items-center justify-center p-1 sm:p-2 shadow-md border border-black/10 shrink-0 text-white font-black text-xs sm:text-base`}>
+          iQIYI
+        </div>
+      );
+
     case 'viu':
       return (
         <div className={`${className} bg-[#FBBF24] rounded-xl sm:rounded-2xl flex items-center justify-center p-1 sm:p-2.5 shadow-md border border-black/10 shrink-0`}>
