@@ -16,7 +16,8 @@
     "check-saldo": "tsx src/scripts/check-saldo.ts",
     "seed": "tsx src/scripts/seed.ts",
     "seed:admin": "tsx src/scripts/seed-admin.ts",
-    "db:clear-transactions": "tsx src/scripts/clear-transactions.ts"
+    "db:clear-transactions": "tsx src/scripts/clear-transactions.ts",
+    "test:gowa": "tsx src/scripts/test-gowa.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",

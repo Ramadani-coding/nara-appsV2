@@ -8,9 +8,9 @@ import {
   verifyOrderToken 
 } from "../services/order.service.js";
 import { 
-  validateWithFonnte, 
+  validateWhatsAppNumber, 
   validateIndonesianPhoneLocal 
-} from "../services/fonnte.service.js";
+} from "../services/whatsapp.service.js";
 import { db } from "../db/index.js";
 import { orders } from "../db/schema.js";
 import { eq, desc, like, or } from "drizzle-orm";
@@ -74,7 +74,7 @@ router.post("/validate-phone", async (req: Request, res: Response) => {
       return;
     }
 
-    const result = await validateWithFonnte(String(phone).trim());
+    const result = await validateWhatsAppNumber(String(phone).trim());
     res.json({
       success: true,
       ...result,

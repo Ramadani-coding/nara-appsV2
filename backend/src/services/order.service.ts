@@ -4,7 +4,10 @@ import { orders, orderItems, payments, deliveries, products } from "../db/schema
 import { eq, desc, sql } from "drizzle-orm";
 import { midtransService } from "./midtrans.service.js";
 import { premiumkuService } from "./premiumku.service.js";
-import { sendFonnteMessage } from "./fonnte.service.js";
+import { 
+  sendWhatsAppMessage, 
+  sendOrderSuccessNotification 
+} from "./whatsapp.service.js";
 
 const ORDER_SECRET_SALT = process.env.ORDER_SECRET_SALT || "nara-order-security-salt-2026-xyz";
 
@@ -300,12 +303,7 @@ export class OrderService {
 
     console.log(`✅ Pembayaran pesanan ${orderNumber} berhasil dikonfirmasi (LUNAS).`);
 
-    // Kirim notifikasi WhatsApp otomatis ke pembeli via Fonnte (asinkronus di latar belakang)
     const clientUrl = process.env.FRONTEND_URL || "http://localhost:5173";
-    sendFonnteMessage(
-      order.customerPhone,
-      `Halo! Pembayaran pesanan *#${orderNumber}* (${order.items[0]?.productName || "Produk Digital"}) sebesar Rp ${order.totalAmount.toLocaleString("id-ID")} telah kami terima (LUNAS).\n\nCek dan buka kredensial akun Kamu di invoice resmi Nara Premium:\n${clientUrl}/invoice/${orderNumber}\n\nTerima kasih telah berbelanja di Nara Premium!`
-    ).catch(() => {});
 
     // 3. Proses otomatis (Auto-Order) ke Premiumku
     try {
@@ -383,6 +381,15 @@ export class OrderService {
               .where(eq(orders.id, order.id));
 
             console.log(`🎉 Pesanan ${orderNumber} berhasil diproses dan dikirimkan ke pelanggan (${premkuAccounts.length} akun).`);
+
+            // Kirim 1 pesan WhatsApp resmi & lengkap bahwa pembayaran sukses & akun digital siap
+            sendOrderSuccessNotification(
+              order.customerPhone,
+              orderNumber,
+              firstItem.productName,
+              order.totalAmount,
+              clientUrl
+            ).catch((err) => console.warn(`⚠️ Gagal kirim WA order success #${orderNumber}:`, err.message));
           } else {
             // Supplier masih memproses antrean pembuatan akun
             // Simpan record delivery dengan status "processing" agar UI pelanggan menampilkan status tunggu dan auto-poll
@@ -431,6 +438,15 @@ export class OrderService {
             completedAt: new Date(),
           })
           .where(eq(orders.id, order.id));
+
+        // Kirim 1 pesan WhatsApp resmi & lengkap bahwa pesanan siap
+        sendOrderSuccessNotification(
+          order.customerPhone,
+          order.orderNumber,
+          firstItem?.productName || "Produk Digital",
+          order.totalAmount,
+          clientUrl
+        ).catch((err) => console.warn(`⚠️ Gagal kirim WA fallback success #${order.orderNumber}:`, err.message));
       }
     } catch (autoOrderErr: any) {
       console.error(`❌ Gagal melakukan auto-order ke Premiumku untuk ${orderNumber}:`, autoOrderErr.message);
@@ -604,6 +620,16 @@ export class OrderService {
 
               order.status = "completed";
               console.log(`✅ Akun Premku berhasil disinkronkan ke delivery pesanan #${order.orderNumber}! (${statusRes.accounts.length} akun)`);
+
+              // Kirim notifikasi WhatsApp bahwa akun digital siap diakses
+              const clientUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+              sendOrderSuccessNotification(
+                order.customerPhone,
+                order.orderNumber,
+                del.productName || "Produk Digital",
+                order.totalAmount || 0,
+                clientUrl
+              ).catch((err) => console.warn(`⚠️ Gagal kirim WA sync success #${order.orderNumber}:`, err.message));
             }
           } catch (err: any) {
             console.warn(`Sync delivery accounts failed for invoice ${invoice}:`, err.message);
