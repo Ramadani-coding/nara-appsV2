@@ -22,14 +22,47 @@ router.use(adminAuthMiddleware);
 
 /**
  * GET /api/admin/stats
- * Mengambil ringkasan statistik toko untuk Dashboard Admin
+ * Mengambil ringkasan statistik toko untuk Dashboard Admin dan Analitik Penjualan
+ * Mendukung filter bulanan (?month=YYYY-MM atau ?month=all) dengan kalkulasi profit bersih margin
  */
-router.get("/stats", async (_req: Request, res: Response) => {
+router.get("/stats", async (req: Request, res: Response) => {
   try {
-    // 1. Total Pendapatan & Pesanan
-    const allOrders = await db.select().from(orders);
-    
-    let totalRevenue = 0;
+    const requestedMonth = typeof req.query.month === "string" ? req.query.month : undefined;
+
+    // 1. Data Produk (untuk status stok & kalkulasi margin HPP)
+    const allProducts = await db.select().from(products);
+    const activeProducts = allProducts.filter(p => p.isActive).length;
+    const emptyStockProducts = allProducts.filter(p => p.stockStatus === "empty" || p.stockCount === 0).length;
+
+    // Buat Map produk untuk lookup cepat O(1)
+    const productMap = new Map<number, typeof products.$inferSelect>();
+    for (const p of allProducts) {
+      productMap.set(p.id, p);
+    }
+
+    // Helper fungsi hitung profit per item pesanan
+    const calculateItemProfit = (item: { productId: number | null; price: number; quantity: number; subtotal: number }) => {
+      const prod = item.productId ? productMap.get(item.productId) : null;
+      let unitCost = 0;
+      if (prod) {
+        if (prod.providerPrice && prod.providerPrice > 0) {
+          unitCost = prod.providerPrice;
+        } else if (prod.marginValue && prod.marginValue > 0) {
+          unitCost = Math.max(0, item.price - prod.marginValue);
+        }
+      }
+      const qty = item.quantity || 1;
+      const profit = item.subtotal - (unitCost * qty);
+      return Math.max(0, profit);
+    };
+
+    // 2. Ambil Semua Pesanan beserta item-nya
+    const allOrders = await db.query.orders.findMany({
+      with: {
+        items: true,
+      },
+    });
+
     const statusCounts: Record<string, number> = {
       waiting_payment: 0,
       paid: 0,
@@ -38,18 +71,123 @@ router.get("/stats", async (_req: Request, res: Response) => {
       failed: 0,
     };
 
+    // Hitung bulan saat ini (Local server date)
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonthNum = String(now.getMonth() + 1).padStart(2, "0");
+    const currentMonthKey = `${currentYear}-${currentMonthNum}`; // Format YYYY-MM
+
+    const MONTH_NAMES_ID = [
+      "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+      "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+    ];
+
+    const formatMonthKeyLabel = (key: string) => {
+      const parts = key.split("-");
+      if (parts.length < 2) return key;
+      const y = parts[0];
+      const mIdx = parseInt(parts[1], 10) - 1;
+      const mName = MONTH_NAMES_ID[mIdx] || parts[1];
+      return `${mName} ${y}`;
+    };
+
+    // Tentukan bulan yang dipilih (default: bulan saat ini jika tidak ada filter)
+    const selectedMonth = requestedMonth || currentMonthKey;
+
+    // Koleksi bulan unik dari semua transaksi
+    const monthKeysSet = new Set<string>();
+    monthKeysSet.add(currentMonthKey); // Selalu sertakan bulan ini (sehingga tgl 1 reset ke 0 secara natural)
+
+    let allTimeRevenue = 0;
+    let allTimeProfit = 0;
+    let allTimePaidOrdersCount = 0;
+
+    let periodRevenue = 0;
+    let periodProfit = 0;
+    let periodPaidOrdersCount = 0;
+
+    // Map untuk akumulasi Top Produk pada periode terpilih
+    const periodProductSalesMap = new Map<string, {
+      productId: number;
+      productName: string;
+      totalQuantity: number;
+      totalSales: number;
+      totalProfit: number;
+    }>();
+
     for (const order of allOrders) {
       const st = order.status || "waiting_payment";
       statusCounts[st] = (statusCounts[st] || 0) + 1;
-      if (st === "paid" || st === "completed") {
-        totalRevenue += order.totalAmount || 0;
+
+      // Catat bulan transaksi (berdasarkan paidAt jika ada, fallback createdAt)
+      const orderDate = order.paidAt ? new Date(order.paidAt) : new Date(order.createdAt);
+      const oYear = orderDate.getFullYear();
+      const oMonth = String(orderDate.getMonth() + 1).padStart(2, "0");
+      const orderMonthKey = `${oYear}-${oMonth}`;
+      monthKeysSet.add(orderMonthKey);
+
+      // Hanya pesanan paid dan completed yang dihitung profit dan omzetnya
+      const isPaidOrCompleted = st === "paid" || st === "completed";
+      if (isPaidOrCompleted) {
+        const orderAmount = order.totalAmount || 0;
+        allTimeRevenue += orderAmount;
+        allTimePaidOrdersCount += 1;
+
+        let orderProfit = 0;
+        if (order.items && order.items.length > 0) {
+          for (const item of order.items) {
+            orderProfit += calculateItemProfit(item);
+          }
+        }
+        allTimeProfit += orderProfit;
+
+        // Cek filter periode
+        const matchesPeriod = selectedMonth === "all" || orderMonthKey === selectedMonth;
+        if (matchesPeriod) {
+          periodRevenue += orderAmount;
+          periodProfit += orderProfit;
+          periodPaidOrdersCount += 1;
+
+          // Akumulasi data produk untuk periode yang dipilih
+          if (order.items && order.items.length > 0) {
+            for (const item of order.items) {
+              const itemProfit = calculateItemProfit(item);
+              const pKey = `${item.productId || 0}_${item.productName}`;
+              const existing = periodProductSalesMap.get(pKey) || {
+                productId: item.productId || 0,
+                productName: item.productName,
+                totalQuantity: 0,
+                totalSales: 0,
+                totalProfit: 0,
+              };
+              existing.totalQuantity += item.quantity || 1;
+              existing.totalSales += item.subtotal || 0;
+              existing.totalProfit += itemProfit;
+              periodProductSalesMap.set(pKey, existing);
+            }
+          }
+        }
       }
     }
 
-    // 2. Data Produk
-    const allProducts = await db.select().from(products);
-    const activeProducts = allProducts.filter(p => p.isActive).length;
-    const emptyStockProducts = allProducts.filter(p => p.stockStatus === "empty" || p.stockCount === 0).length;
+    // Urutkan daftar bulan secara descending (terbaru di atas)
+    const sortedMonthKeys = Array.from(monthKeysSet).sort((a, b) => b.localeCompare(a));
+    const availableMonths = sortedMonthKeys.map((key) => ({
+      key,
+      label: formatMonthKeyLabel(key),
+      isCurrent: key === currentMonthKey,
+    }));
+
+    // Top Selling Products periode terpilih (maks 10 produk)
+    const topProducts = Array.from(periodProductSalesMap.values())
+      .sort((a, b) => b.totalQuantity - a.totalQuantity || b.totalSales - a.totalSales)
+      .slice(0, 10);
+
+    // Rasio Margin Keuntungan
+    const periodMarginPercentage = periodRevenue > 0 ? Math.round((periodProfit / periodRevenue) * 100) : 0;
+    const allTimeMarginPercentage = allTimeRevenue > 0 ? Math.round((allTimeProfit / allTimeRevenue) * 100) : 0;
+
+    const selectedMonthLabel = selectedMonth === "all" ? "Semua Waktu" : formatMonthKeyLabel(selectedMonth);
 
     // 3. Saldo Premiumku API
     let premkuSaldo = 0;
@@ -59,7 +197,6 @@ router.get("/stats", async (_req: Request, res: Response) => {
         premkuSaldo = profileData.data.saldo;
       }
     } catch (_err) {
-      // Fallback jika API sedang throttled/offline
       premkuSaldo = 0;
     }
 
@@ -73,23 +210,11 @@ router.get("/stats", async (_req: Request, res: Response) => {
       },
     });
 
-    // 5. Produk Terlaris (Top Selling)
-    const topItems = await db
-      .select({
-        productId: orderItems.productId,
-        productName: orderItems.productName,
-        totalQuantity: sql<number>`cast(sum(${orderItems.quantity}) as integer)`,
-        totalSales: sql<number>`cast(sum(${orderItems.subtotal}) as integer)`,
-      })
-      .from(orderItems)
-      .groupBy(orderItems.productId, orderItems.productName)
-      .orderBy(sql`sum(${orderItems.quantity}) desc`)
-      .limit(5);
-
     res.json({
       success: true,
       data: {
-        totalRevenue,
+        // Backwards compatibility untuk AdminDashboard:
+        totalRevenue: allTimeRevenue,
         totalOrders: allOrders.length,
         statusCounts,
         activeProducts,
@@ -97,7 +222,24 @@ router.get("/stats", async (_req: Request, res: Response) => {
         emptyStockProducts,
         premkuSaldo,
         recentOrders,
-        topProducts: topItems,
+        topProducts,
+
+        // Metrik Lengkap Profit & Analitik Penjualan:
+        allTime: {
+          revenue: allTimeRevenue,
+          profit: allTimeProfit,
+          orders: allTimePaidOrdersCount,
+          marginPercentage: allTimeMarginPercentage,
+        },
+        selectedPeriod: {
+          month: selectedMonth,
+          monthLabel: selectedMonthLabel,
+          revenue: periodRevenue,
+          profit: periodProfit,
+          orders: periodPaidOrdersCount,
+          marginPercentage: periodMarginPercentage,
+        },
+        availableMonths,
       },
     });
   } catch (error: any) {
