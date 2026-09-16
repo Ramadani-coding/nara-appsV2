@@ -29,7 +29,7 @@ async function runTest() {
   const dummyRes = await validateWhatsAppNumber("08123456789");
   console.log("Dummy result (should be invalid):", dummyRes);
 
-  console.log("\n5. Simulasi Pengiriman 1 Pesan Notifikasi Baru ke Pelanggan (6281349172032):");
+  console.log("\n5. Simulasi Pengiriman Notifikasi ke WhatsApp 085750231336:");
   const { sendOrderSuccessNotification } = await import("../services/whatsapp.service.js");
 
   const targetPhone = process.env.ADMIN_WHATSAPP_PHONE || "085750231336";

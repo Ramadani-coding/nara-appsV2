@@ -361,6 +361,7 @@ export async function sendOrderSuccessNotification(
   const intlAdminPhone = cleanAdminPhone.startsWith("0") 
     ? "62" + cleanAdminPhone.slice(1) 
     : cleanAdminPhone;
+  const groupUrl = process.env.WHATSAPP_GROUP_URL || "https://chat.whatsapp.com/KeV14EMUo6m1aUlQb9TL0K";
 
   const message = 
 `Halo Kak! Pesanan kamu di *Nara Premium* udah siap nih ✨
@@ -371,6 +372,10 @@ export async function sendOrderSuccessNotification(
 
 Langsung ambil email & password akun kamu di sini ya:
 👉 ${clientUrl}/invoice/${orderNumber}
+
+📢 *Mau info update stok & promo produk terbaru?*
+Yuk gabung ke grup WhatsApp Nara Premium:
+👉 ${groupUrl}
 
 Kalau butuh bantuan login atau klaim garansi, silakan hubungi Admin Nara di sini ya:
 💬 wa.me/${intlAdminPhone} (${adminPhone})
