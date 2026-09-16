@@ -9,7 +9,7 @@ import {
   Eye, 
   EyeOff 
 } from "lucide-react";
-import { API_BASE_URL, adminFetch } from "../../lib/api";
+import { adminFetch } from "../../lib/api";
 import { broadcastCatalogProductUpdate } from "../../lib/useLiveCatalog";
 
 interface Category {
@@ -83,7 +83,7 @@ export default function AdminProducts() {
     setSyncing(true);
     setToastMsg(null);
     try {
-      const res = await fetch(`${API_BASE_URL}/products/sync`, { method: "POST" });
+      const res = await adminFetch("/products/sync", { method: "POST" });
       const json = await res.json();
       if (json.success) {
         setToastMsg("✅ Katalog produk berhasil disinkronkan dari Premiumku! Margin Anda tetap aman.");

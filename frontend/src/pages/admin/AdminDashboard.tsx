@@ -13,7 +13,7 @@ import {
   Layers, 
   TrendingUp
 } from "lucide-react";
-import { API_BASE_URL, adminFetch } from "../../lib/api";
+import { adminFetch } from "../../lib/api";
 
 interface AdminStats {
   totalRevenue: number;
@@ -58,7 +58,7 @@ export default function AdminDashboard() {
     setSyncing(true);
     setSyncMsg(null);
     try {
-      const res = await fetch(`${API_BASE_URL}/products/sync`, { method: "POST" });
+      const res = await adminFetch("/products/sync", { method: "POST" });
       const json = await res.json();
       if (json.success) {
         setSyncMsg("✅ Sinkronisasi produk berhasil diselesaikan!");

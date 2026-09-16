@@ -389,6 +389,28 @@ router.get("/products", async (_req: Request, res: Response) => {
 });
 
 /**
+ * POST /api/admin/products/sync
+ * Memicu sinkronisasi manual katalog produk dari provider Premiumku
+ */
+router.post("/products/sync", async (_req: Request, res: Response) => {
+  try {
+    const syncResult = await syncService.syncProductsFromProvider();
+    res.json({
+      success: true,
+      message: "Sinkronisasi produk berhasil",
+      data: syncResult,
+    });
+  } catch (error: any) {
+    console.error("Error syncing products from admin route:", error);
+    res.status(500).json({
+      success: false,
+      message: "Gagal melakukan sinkronisasi produk",
+      error: error.message,
+    });
+  }
+});
+
+/**
  * PATCH /api/admin/products/:id/margin
  * Mengubah margin flat Rupiah (markup flat) untuk satu produk
  * harga_jual = provider_price + margin_value
