@@ -5,7 +5,6 @@ import {
   RefreshCw, 
   Edit3, 
   X, 
-  Calculator, 
   Eye, 
   EyeOff 
 } from "lucide-react";
@@ -268,24 +267,6 @@ export default function AdminProducts() {
           {toastMsg}
         </motion.div>
       )}
-
-      {/* Info Card: Margin Calculation Explainer */}
-      <div className="p-4 bg-brand-pink-soft dark:bg-[#381E2E] border-2 border-black dark:border-gray-700 shadow-[4px_4px_0px_#000] rounded-2xl flex items-start gap-3">
-        <Calculator className="w-5 h-5 text-brand-pink shrink-0 mt-0.5" />
-        <div className="text-xs space-y-1">
-          <div className="font-black uppercase tracking-wider text-black dark:text-white">
-            RUMUS PERHITUNGAN HARGA JUAL (FLAT MARKUP RUPIAH):
-          </div>
-          <div className="font-bold text-gray-700 dark:text-gray-200">
-            <span className="font-mono bg-white dark:bg-black/40 px-2 py-0.5 border border-black dark:border-gray-700 rounded">
-              Harga Jual = Harga Modal Provider (Rp) + Margin Flat (Rp)
-            </span>
-          </div>
-          <p className="text-gray-600 dark:text-gray-300">
-            Margin selalu bertipe flat Rupiah (bukan persentase). Contoh: Modal Rp 500 + Margin Rp 1.500 = Harga Jual Rp 2.000.
-          </p>
-        </div>
-      </div>
 
       {/* ========================================================
           FILTERS & SEARCH

@@ -6,7 +6,8 @@ import {
   ChevronRight, 
   X, 
   ShieldCheck, 
-  AlertCircle 
+  AlertCircle,
+  Users
 } from 'lucide-react';
 
 function InstagramIcon({ className = "w-4 h-4" }: { className?: string }) {
@@ -70,8 +71,8 @@ export function Footer() {
               Platform digital andalan untuk upgrade produktivitas dan hiburanmu tanpa bikin dompet boncos. Nikmati pengalaman belanja akun premium yang 100% aman, diproses otomatis secara instan, dengan penawaran harga spesial.
             </p>
 
-            {/* Social Icons in Neo-Brutalist circular buttons */}
-            <div className="flex items-center gap-3 pt-2">
+            {/* Social Icons & Join WhatsApp Group Button */}
+            <div className="flex flex-wrap items-center gap-3 pt-2">
               <a
                 href="https://www.instagram.com/herama.my.id"
                 target="_blank"
@@ -87,9 +88,20 @@ export function Footer() {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="WhatsApp"
+                title="Chat WhatsApp Admin"
                 className="w-9 h-9 rounded-full bg-white dark:bg-[#1E2333] border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] flex items-center justify-center text-gray-700 dark:text-gray-200 hover:text-emerald-600 hover:bg-emerald-50 hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all cursor-pointer"
               >
                 <MessageCircle className="w-4 h-4" />
+              </a>
+
+              <a
+                href="https://chat.whatsapp.com/KeV14EMUo6m1aUlQb9TL0K"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-3.5 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs uppercase rounded-xl border-2 border-black dark:border-gray-700 shadow-[2.5px_2.5px_0px_#000] hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-[1px_1px_0px_#000] transition-all cursor-pointer"
+              >
+                <Users className="w-4 h-4 text-white" />
+                <span>Join Grup Update Stok</span>
               </a>
             </div>
           </div>
@@ -161,6 +173,17 @@ export function Footer() {
                   <span className="font-mono font-bold">085750231336</span>
                 </a>
               </li>
+              <li className="pt-1">
+                <a
+                  href="https://chat.whatsapp.com/KeV14EMUo6m1aUlQb9TL0K"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-3 py-1.5 bg-brand-yellow hover:bg-yellow-400 text-black font-black text-xs uppercase border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none rounded-xl transition-all cursor-pointer"
+                >
+                  <Users className="w-3.5 h-3.5 text-black" />
+                  <span>Grup WhatsApp</span>
+                </a>
+              </li>
             </ul>
           </div>
 
@@ -219,7 +242,7 @@ export function Footer() {
 
               <div className="space-y-2">
                 <h4 className="font-black text-black dark:text-white">3. Klaim Kendala & Bantuan</h4>
-                <p>Klaim bantuan dapat dilakukan 24/7 melalui nomor WhatsApp resmi kami (+62 895-0666-7156) dengan melampirkan nomor Invoice.</p>
+                <p>Klaim bantuan dapat dilakukan 24/7 melalui nomor WhatsApp resmi kami (085750231336) dengan melampirkan nomor Invoice.</p>
               </div>
             </div>
 

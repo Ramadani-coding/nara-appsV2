@@ -15,7 +15,8 @@ import {
   Send,
   Copy,
   Check,
-  ExternalLink
+  ExternalLink,
+  MessageCircle
 } from "lucide-react";
 import { API_BASE_URL, adminFetch } from "../../lib/api";
 
@@ -117,6 +118,21 @@ interface FailureReasonInfo {
   title: string;
   description: string;
   code?: string;
+}
+
+function formatWhatsAppUrl(rawPhone: string, orderNumber?: string): string {
+  let clean = String(rawPhone || "").replace(/\D/g, "");
+  if (clean.startsWith("0")) {
+    clean = "62" + clean.slice(1);
+  } else if (clean.startsWith("8")) {
+    clean = "62" + clean;
+  }
+  const baseUrl = `https://wa.me/${clean}`;
+  if (orderNumber) {
+    const text = `Halo kak, saya Admin Nara Premium mengenai pesanan ${orderNumber}.`;
+    return `${baseUrl}?text=${encodeURIComponent(text)}`;
+  }
+  return baseUrl;
 }
 
 function getOrderFailureReason(order: Order): FailureReasonInfo | null {
@@ -567,9 +583,19 @@ export default function AdminOrders() {
                       {order.orderNumber}
                     </td>
                     <td className="py-3.5 px-4">
-                      <div className="font-bold text-black dark:text-white flex items-center gap-1">
+                      <div className="font-bold text-black dark:text-white flex items-center gap-1.5">
                         <Phone className="w-3 h-3 text-emerald-600 shrink-0" />
-                        <span>{order.customerPhone}</span>
+                        <a
+                          href={formatWhatsAppUrl(order.customerPhone, order.orderNumber)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hover:text-emerald-600 hover:underline inline-flex items-center gap-1 text-xs"
+                          title="Hubungi via WhatsApp"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <span>{order.customerPhone}</span>
+                          <ExternalLink className="w-2.5 h-2.5 opacity-60 hover:opacity-100 shrink-0" />
+                        </a>
                       </div>
                       {order.customerEmail && (
                         <div className="text-[11px] text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-0.5">
@@ -657,9 +683,29 @@ export default function AdminOrders() {
 
               {/* Customer Contact */}
               <div className="bg-gray-50 dark:bg-[#12141C] p-3 rounded-xl border border-gray-200 dark:border-gray-800 space-y-1 text-xs">
-                <div className="font-bold flex items-center gap-1.5 text-black dark:text-white">
-                  <Phone className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>{order.customerPhone}</span>
+                <div className="font-bold flex items-center justify-between gap-1.5 text-black dark:text-white">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <Phone className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <a
+                      href={formatWhatsAppUrl(order.customerPhone, order.orderNumber)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:text-emerald-600 hover:underline inline-flex items-center gap-1 truncate font-mono"
+                      title="Hubungi via WhatsApp"
+                    >
+                      <span>{order.customerPhone}</span>
+                      <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
+                    </a>
+                  </div>
+                  <a
+                    href={formatWhatsAppUrl(order.customerPhone, order.orderNumber)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-2 py-0.5 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-[9px] uppercase rounded border border-black shadow-[1px_1px_0px_#000] shrink-0 inline-flex items-center gap-1"
+                  >
+                    <MessageCircle className="w-2.5 h-2.5" />
+                    <span>Chat WA</span>
+                  </a>
                 </div>
                 {order.customerEmail && (
                   <div className="text-[11px] text-gray-500 dark:text-gray-400 flex items-center gap-1.5 truncate">
@@ -770,9 +816,31 @@ export default function AdminOrders() {
                   <div className="text-[10px] font-black uppercase text-gray-500 tracking-wider">
                     DATA PEMBELI
                   </div>
-                  <div className="text-xs font-bold flex items-center gap-1.5">
-                    <Phone className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>WhatsApp: {selectedOrder.customerPhone}</span>
+                  <div className="text-xs font-bold flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Phone className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span className="text-gray-700 dark:text-gray-300">WhatsApp:</span>
+                      <a
+                        href={formatWhatsAppUrl(selectedOrder.customerPhone, selectedOrder.orderNumber)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono text-emerald-600 dark:text-emerald-400 hover:underline inline-flex items-center gap-1"
+                        title="Klik untuk chat WhatsApp"
+                      >
+                        <span>{selectedOrder.customerPhone}</span>
+                        <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                      </a>
+                    </div>
+                    <a
+                      href={formatWhatsAppUrl(selectedOrder.customerPhone, selectedOrder.orderNumber)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-[10px] uppercase rounded border border-black shadow-[1.5px_1.5px_0px_#000] hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none transition-all cursor-pointer inline-flex items-center gap-1 shrink-0"
+                      title="Hubungi pembeli via WhatsApp"
+                    >
+                      <MessageCircle className="w-3 h-3" />
+                      <span>Chat WA</span>
+                    </a>
                   </div>
                   <div className="text-xs font-bold flex items-center gap-1.5">
                     <Mail className="w-3.5 h-3.5 text-brand-blue" />
