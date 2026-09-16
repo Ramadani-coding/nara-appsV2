@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { type ProductPackage } from '../lib/mockData';
 import { useLiveService } from '../lib/useLiveCatalog';
-import { ArrowLeft, Share2, Check, Sparkles, Wrench } from 'lucide-react';
+import { ArrowLeft, Share2, Check, Sparkles, Clock } from 'lucide-react';
 import { AppLogo } from '../components/AppLogo';
 import { LiveSalesToast } from '../components/LiveSalesToast';
 import { usePremkuBalance } from '../lib/usePremkuBalance';
@@ -161,8 +161,8 @@ export default function ProductDetail() {
                       'HABIS'
                     ) : isPkgMaintenance ? (
                       <>
-                        <Wrench className="w-2.5 h-2.5 text-amber-700 shrink-0" />
-                        <span>MAINTENANCE</span>
+                        <Clock className="w-2.5 h-2.5 text-amber-700 shrink-0" />
+                        <span>COMING SOON</span>
                       </>
                     ) : (
                       pkg.stockBadge
@@ -176,8 +176,8 @@ export default function ProductDetail() {
                   )}
 
                   {isPkgMaintenance && (
-                    <span className="px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-black uppercase bg-gray-100 text-gray-700 border border-black rounded-md shadow-[1px_1px_0px_#000] shrink-0">
-                      SISTEM
+                    <span className="px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-black uppercase bg-amber-100 text-amber-900 border border-black rounded-md shadow-[1px_1px_0px_#000] shrink-0">
+                      SEGERA
                     </span>
                   )}
                 </div>
@@ -226,7 +226,8 @@ export default function ProductDetail() {
                 ) : isPkgMaintenance ? (
                   <MaintenanceTooltip
                     isActive={true}
-                    message="Produk sedang maintenance. Layanan paket ini sementara belum dapat dipesan karena sedang dalam pemeliharaan sistem. Silakan coba beberapa saat lagi."
+                    title="PRODUK COMING SOON"
+                    message="Layanan paket ini akan segera hadir. Pembelian belum dapat diproses saat ini, silakan pantau kembali secara berkala."
                     className="w-full"
                     position="top"
                   >
@@ -236,8 +237,8 @@ export default function ProductDetail() {
                       aria-disabled="true"
                       className="w-full py-2 sm:py-2.5 bg-amber-200 hover:bg-amber-300 dark:bg-amber-900/60 dark:hover:bg-amber-900 text-amber-950 dark:text-amber-100 font-black text-[10px] sm:text-xs uppercase tracking-wider border-2 border-black rounded-lg sm:rounded-xl cursor-not-allowed select-none flex items-center justify-center gap-1.5 shadow-[2px_2px_0px_#000] transition-colors"
                     >
-                      <Wrench className="w-3.5 h-3.5 text-amber-900 dark:text-amber-200 shrink-0" />
-                      <span>MAINTENANCE</span>
+                      <Clock className="w-3.5 h-3.5 text-amber-900 dark:text-amber-200 shrink-0" />
+                      <span>COMING SOON</span>
                     </button>
                   </MaintenanceTooltip>
                 ) : (

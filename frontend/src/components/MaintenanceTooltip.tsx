@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect, useLayoutEffect, type ReactNode } from 'react';
-import { Wrench } from 'lucide-react';
+import { Clock } from 'lucide-react';
 
 interface MaintenanceTooltipProps {
   children: ReactNode;
   isActive?: boolean;
+  title?: string;
   message?: string;
   position?: 'top' | 'bottom';
   className?: string;
@@ -12,7 +13,8 @@ interface MaintenanceTooltipProps {
 export function MaintenanceTooltip({
   children,
   isActive = true,
-  message = "Produk ini sedang dalam pemeliharaan sistem. Silakan coba beberapa saat lagi.",
+  title = "PRODUK COMING SOON",
+  message = "Layanan paket ini akan segera hadir. Pembelian belum dapat diproses saat ini, silakan pantau kembali secara berkala.",
   position = 'top',
   className = '',
 }: MaintenanceTooltipProps) {
@@ -118,7 +120,7 @@ export function MaintenanceTooltip({
       onMouseLeave={() => setIsVisible(false)}
       onClick={() => setIsVisible((prev) => !prev)}
       role="tooltip"
-      aria-label="Produk sedang maintenance"
+      aria-label={title}
     >
       {children}
 
@@ -140,8 +142,8 @@ export function MaintenanceTooltip({
           {/* Tooltip Card */}
           <div className="bg-[#181C2A] text-white p-3 rounded-xl border-2 border-black shadow-[3px_3px_0px_#000000] text-left">
             <div className="flex items-center gap-1.5 font-black text-xs uppercase tracking-wider text-amber-400 mb-1">
-              <Wrench className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              <span>SEDANG MAINTENANCE</span>
+              <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span>{title}</span>
             </div>
             <p className="text-[11px] leading-relaxed text-gray-200 font-medium break-words">
               {message}
