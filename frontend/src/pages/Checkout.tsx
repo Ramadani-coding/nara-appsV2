@@ -256,9 +256,6 @@ export default function Checkout() {
         <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-black dark:text-white">
           Konfirmasi Pesanan
         </h1>
-        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 font-medium">
-          Cek rincian paket pilihan Anda dan masukkan nomor WhatsApp untuk penerimaan akun.
-        </p>
       </div>
 
       {/* Warning Banner if Out of Stock or Maintenance */}
@@ -491,7 +488,7 @@ export default function Checkout() {
             </h2>
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mt-1">
-            Kredensial dan akses akun digital akan otomatis dikirim ke nomor ini.
+            Akses akun akan otomatis dikirim ke nomor ini.
           </p>
         </div>
         
@@ -577,7 +574,7 @@ export default function Checkout() {
           ) : (
             <div className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400 font-medium">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-              <span>Wajib nomor seluler aktif Indonesia.</span>
+              <span>Wajib nomor aktif Indonesia.</span>
             </div>
           )}
         </div>
