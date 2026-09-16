@@ -13,7 +13,7 @@ import {
   Sparkles,
   CheckCircle2,
   AlertTriangle,
-  Wrench,
+  Clock,
   Loader2
 } from 'lucide-react';
 import { AppLogo } from '../components/AppLogo';
@@ -258,7 +258,7 @@ export default function Checkout() {
         </h1>
       </div>
 
-      {/* Warning Banner if Out of Stock or Maintenance */}
+      {/* Warning Banner if Out of Stock or Coming Soon */}
       {isOutOfStock ? (
         <div className="p-3.5 bg-rose-50 dark:bg-rose-950/60 border-2 border-rose-500 rounded-xl flex items-center gap-3 text-rose-800 dark:text-rose-200 text-xs font-bold shadow-[3px_3px_0px_#000]">
           <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
@@ -269,10 +269,10 @@ export default function Checkout() {
         </div>
       ) : isSelectedPkgMaintenance ? (
         <div className="p-3.5 bg-amber-50 dark:bg-amber-950/60 border-2 border-amber-500 rounded-xl flex items-center gap-3 text-amber-950 dark:text-amber-100 text-xs font-bold shadow-[3px_3px_0px_#000]">
-          <Wrench className="w-5 h-5 text-amber-600 shrink-0" />
+          <Clock className="w-5 h-5 text-amber-600 shrink-0" />
           <div>
-            <span className="font-black block uppercase text-[11px]">Produk Sedang Maintenance</span>
-            <span>Layanan untuk paket ini sedang dalam masa pemeliharaan sistem. Pembelian belum dapat diproses saat ini.</span>
+            <span className="font-black block uppercase text-[11px]">Produk Segera Hadir (Coming Soon)</span>
+            <span>Layanan untuk paket ini sedang disiapkan dan akan segera hadir. Pembelian belum dapat diproses saat ini.</span>
           </div>
         </div>
       ) : null}
@@ -291,8 +291,8 @@ export default function Checkout() {
             </span>
           ) : isSelectedPkgMaintenance ? (
             <span className="text-[10px] font-black px-2.5 py-1 bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border border-amber-500 rounded-md flex items-center gap-1">
-              <Wrench className="w-3 h-3 text-amber-700" />
-              <span>MAINTENANCE</span>
+              <Clock className="w-3 h-3 text-amber-700 dark:text-amber-300" />
+              <span>COMING SOON</span>
             </span>
           ) : (
             <span className="text-[10px] font-black px-2.5 py-1 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-black dark:border-gray-700 rounded-md">
@@ -329,8 +329,8 @@ export default function Checkout() {
                   </span>
                 ) : isSelectedPkgMaintenance ? (
                   <span className="px-2 py-0.5 text-[9px] font-black uppercase bg-amber-400 text-amber-950 rounded-md shrink-0 border border-black shadow-[1px_1px_0px_#000] flex items-center gap-1">
-                    <Wrench className="w-2.5 h-2.5 text-amber-900" />
-                    <span>MAINTENANCE</span>
+                    <Clock className="w-2.5 h-2.5 text-amber-900" />
+                    <span>COMING SOON</span>
                   </span>
                 ) : null}
               </div>
@@ -409,7 +409,7 @@ export default function Checkout() {
               </span>
             ) : isSelectedPkgMaintenance ? (
               <span className="text-[10px] text-amber-600 dark:text-amber-400 font-extrabold block mt-0.5">
-                Pembelian dinonaktifkan (sedang maintenance)
+                Pembelian dinonaktifkan (segera hadir / coming soon)
               </span>
             ) : maxAllowedQty > 0 ? (
               <span className="text-[10px] text-brand-blue dark:text-cyan-400 font-extrabold block mt-0.5">
@@ -646,8 +646,8 @@ export default function Checkout() {
             </>
           ) : isSelectedPkgMaintenance ? (
             <>
-              <Wrench className="w-4 h-4 text-amber-900 dark:text-amber-200" />
-              <span>PRODUK SEDANG MAINTENANCE</span>
+              <Clock className="w-4 h-4 text-amber-900 dark:text-amber-200" />
+              <span>PRODUK COMING SOON</span>
             </>
           ) : (
             <>
