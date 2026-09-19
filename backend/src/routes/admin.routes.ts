@@ -282,8 +282,9 @@ router.get("/orders", async (req: Request, res: Response) => {
       const q = search.toLowerCase();
       filtered = filtered.filter(o => 
         o.orderNumber.toLowerCase().includes(q) ||
-        o.customerPhone.toLowerCase().includes(q) ||
+        (o.customerPhone && o.customerPhone.toLowerCase().includes(q)) ||
         (o.customerEmail && o.customerEmail.toLowerCase().includes(q)) ||
+        (o.discordUserId && o.discordUserId.toLowerCase().includes(q)) ||
         o.items.some(it => it.productName.toLowerCase().includes(q))
       );
     }

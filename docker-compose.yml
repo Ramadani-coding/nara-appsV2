@@ -13,6 +13,7 @@ services:
     environment:
       - PORT=5001
       - NODE_ENV=production
+      - DISCORD_BOT_WEBHOOK_URL=${DISCORD_BOT_WEBHOOK_URL:-http://bot:5002/webhook/delivery}
     networks:
       - nara-network
     healthcheck:
@@ -45,7 +46,27 @@ services:
       - nara-network
 
   # ==========================================
-  # Service 3: PostgreSQL Lokal (Opsional)
+  # Service 3: Bot Discord (Node.js + discord.js)
+  # ==========================================
+  bot:
+    build:
+      context: ./bot
+      dockerfile: Dockerfile
+    container_name: nara-discord-bot
+    restart: unless-stopped
+    env_file:
+      - ./bot/.env
+    environment:
+      - NODE_ENV=production
+      - BACKEND_URL=http://backend:5001/api
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - nara-network
+
+  # ==========================================
+  # Service 4: PostgreSQL Lokal (Opsional)
   # Diaktifkan hanya jika ingin menggunakan database lokal di VPS
   # daripada Supabase Cloud (Jalankan: docker compose --profile db up -d)
   # ==========================================

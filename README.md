@@ -44,6 +44,13 @@ Aplikasi ini mengatasi masalah lambatnya transaksi manual melalui chat admin den
 - **Desain Neobrutalism Modern:** Tampilan unik, kontras tinggi, micro-interaction halus, serta dukungan tema Dark Mode & Light Mode.
 - **Grup WhatsApp & Komunitas:** Tautan langsung di bagian footer dan notifikasi untuk memudahkan pembeli bergabung ke grup update stok dan promo.
 
+### 🤖 Kanal Alternatif Bot Discord (Fase 5)
+- **Katalog via Discord:** Jelajah katalog via slash command `/produk` dengan filter kategori dan paging tombol.
+- **Guest Checkout Instan:** Pembeli cukup diidentifikasi melalui `discord_user_id` tanpa perlu registrasi atau nomor telepon.
+- **QRIS Langsung di Discord:** Menampilkan gambar QRIS Midtrans interaktif di Discord beserta nominal dan batas waktu.
+- **Auto-Delivery via DM Discord:** Setelah pembayaran lunas, rincian akun/lisensi otomatis meluncur ke DM Discord pembeli.
+- **Cek Status Privat (`/pesanan-saya`):** Pelacakan riwayat pesanan yang terisolasi khusus untuk akun Discord pemanggil demi menjaga privasi.
+
 ### 🛡️ Untuk Administrator (Admin Dashboard)
 - **Keamanan Ketat:** Terproteksi Supabase Auth JWT dengan verifikasi role Administrator.
 - **Statistik & Analitik Penjualan Lengkap:**
@@ -69,13 +76,16 @@ Aplikasi ini mengatasi masalah lambatnya transaksi manual melalui chat admin den
 +-------------------------------------------------------------+
 |                     PELANGGAN / USER                        |
 +-------------------------------------------------------------+
-                               |
-               (1) Beli Produk & Bayar QRIS
-                               v
-+-------------------------------------------------------------+
-|                  FRONTEND (React + Vite)                    |
-|             TailwindCSS Neobrutalism Design                 |
-+-------------------------------------------------------------+
+               |                               |
+       (1a) Web Store                   (1b) Bot Discord
+        (Beli & QRIS)                    (/produk & QRIS)
+               v                               v
++-----------------------------+ +-----------------------------+
+|   FRONTEND (React + Vite)   | |   BOT (discord.js v14)      |
+| TailwindCSS Neobrutalism UI | | Service Node.js Terpisah    |
++-----------------------------+ +-----------------------------+
+               |                               |
+               +---------------v---------------+
                                |
                    (2) REST API Calls / Polling
                                v
@@ -84,11 +94,11 @@ Aplikasi ini mengatasi masalah lambatnya transaksi manual melalui chat admin den
 |             TypeScript + Drizzle ORM + PostgreSQL           |
 +-------------------------------------------------------------+
          |                       |                     |
- (3) Callback QRIS        (4) Order API        (5) Kirim WA
+ (3) Callback QRIS        (4) Order API        (5) Notifikasi
          v                       v                     v
 +------------------+   +-------------------+   +---------------+
-|     MIDTRANS     |   |     PREMIUMKU     |   |     GoWA      |
-| Payment Gateway  |   | Supplier Provider |   |  WA Gateway   |
+|     MIDTRANS     |   |     PREMIUMKU     |   |  GoWA / DM    |
+| Payment Gateway  |   | Supplier Provider |   | WhatsApp / Bot|
 +------------------+   +-------------------+   +---------------+
 ```
 
@@ -103,6 +113,12 @@ Aplikasi ini mengatasi masalah lambatnya transaksi manual melalui chat admin den
 - **Animasi:** Framer Motion
 - **Icons:** Lucide React
 - **Routing:** React Router DOM (v6)
+
+### Bot Discord (Fase 5)
+- **Library:** discord.js (v14)
+- **QR Generator:** qrcode
+- **Runtime:** Node.js (v18+)
+- **Komunikasi:** REST API Backend
 
 ### Backend
 - **Runtime:** Node.js (v18+)

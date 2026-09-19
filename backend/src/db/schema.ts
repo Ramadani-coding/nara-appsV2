@@ -56,18 +56,21 @@ export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
   orderNumber: varchar("order_number", { length: 100 }).notNull().unique(),
   refId: varchar("ref_id", { length: 100 }).notNull().unique(),
-  customerPhone: varchar("customer_phone", { length: 50 }).notNull(),
+  customerPhone: varchar("customer_phone", { length: 50 }),
   customerEmail: varchar("customer_email", { length: 255 }),
   status: varchar("status", { length: 50 }).notNull().default("waiting_payment"),
   totalAmount: integer("total_amount").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   paidAt: timestamp("paid_at", { withTimezone: true }),
   completedAt: timestamp("completed_at", { withTimezone: true }),
+  discordUserId: varchar("discord_user_id", { length: 100 }),
+  discordDmSent: boolean("discord_dm_sent").notNull().default(false),
 }, (table) => [
   index("orders_order_number_idx").on(table.orderNumber),
   index("orders_ref_id_idx").on(table.refId),
   index("orders_customer_phone_idx").on(table.customerPhone),
   index("orders_status_idx").on(table.status),
+  index("orders_discord_user_id_idx").on(table.discordUserId),
 ]);
 
 // -----------------------------------------------------------------------------

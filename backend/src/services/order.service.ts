@@ -86,8 +86,9 @@ export interface CreateOrderParams {
   productName?: string;
   price?: number;
   quantity: number;
-  customerPhone: string;
+  customerPhone?: string;
   customerEmail?: string;
+  discordUserId?: string;
 }
 
 export function parseMidtransExpiry(rawCallback: any): string | null {
@@ -116,11 +117,36 @@ export function parseMidtransExpiry(rawCallback: any): string | null {
 
 export class OrderService {
   /**
+   * Mengirim notifikasi webhook ke bot Discord jika configured
+   */
+  private async notifyDiscordBotIfConfigured(orderId: number, orderNumber: string, discordUserId?: string | null) {
+    if (!discordUserId) return;
+    const webhookUrl = process.env.DISCORD_BOT_WEBHOOK_URL;
+    if (!webhookUrl) return;
+    try {
+      await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          event: "order_completed",
+          orderId,
+          orderNumber,
+          discordUserId,
+        }),
+      });
+      console.log(`🤖 Notifikasi webhook terkirim ke Discord bot untuk pesanan #${orderNumber}`);
+    } catch (err: any) {
+      console.warn(`⚠️ Gagal mengirim webhook ke bot Discord:`, err.message);
+    }
+  }
+
+  /**
    * Membuat pesanan baru dan menghasilkan transaksi QRIS melalui Midtrans Core API
    */
   async createOrderWithQris(params: CreateOrderParams) {
-    if (!params.customerPhone || !params.customerPhone.trim()) {
-      throw new Error("Nomor WhatsApp/telepon pelanggan wajib diisi");
+    const resolvedPhone = params.customerPhone?.trim() || (params.discordUserId ? `discord:${params.discordUserId.trim()}` : "");
+    if (!resolvedPhone) {
+      throw new Error("Nomor WhatsApp/telepon atau identitas Discord pelanggan wajib diisi");
     }
 
     const qty = Math.min(100, Math.max(1, params.quantity || 1));
@@ -173,8 +199,9 @@ export class OrderService {
       .values({
         orderNumber,
         refId,
-        customerPhone: params.customerPhone.trim(),
+        customerPhone: resolvedPhone,
         customerEmail: params.customerEmail?.trim() || null,
+        discordUserId: params.discordUserId?.trim() || null,
         status: "waiting_payment",
         totalAmount,
       })
@@ -196,7 +223,7 @@ export class OrderService {
       qrisCharge = await midtransService.createQrisCharge({
         orderNumber: newOrder.orderNumber,
         grossAmount: totalAmount,
-        customerPhone: newOrder.customerPhone,
+        customerPhone: newOrder.customerPhone || "081200000000",
         customerEmail: newOrder.customerEmail || undefined,
         items: [
           {
@@ -230,7 +257,7 @@ export class OrderService {
       })
       .returning();
 
-    const accessToken = generateOrderToken(newOrder.orderNumber, newOrder.customerPhone);
+    const accessToken = generateOrderToken(newOrder.orderNumber, newOrder.customerPhone || "");
 
     return {
       orderId: newOrder.id,
@@ -241,6 +268,7 @@ export class OrderService {
       status: newOrder.status,
       customerPhone: newOrder.customerPhone,
       customerEmail: newOrder.customerEmail,
+      discordUserId: newOrder.discordUserId,
       productName,
       quantity: qty,
       unitPrice,
@@ -380,16 +408,21 @@ export class OrderService {
               })
               .where(eq(orders.id, order.id));
 
+            // Notifikasi bot Discord jika pemesanan via Discord
+            this.notifyDiscordBotIfConfigured(order.id, orderNumber, order.discordUserId);
+
             console.log(`🎉 Pesanan ${orderNumber} berhasil diproses dan dikirimkan ke pelanggan (${premkuAccounts.length} akun).`);
 
-            // Kirim 1 pesan WhatsApp resmi & lengkap bahwa pembayaran sukses & akun digital siap
-            sendOrderSuccessNotification(
-              order.customerPhone,
-              orderNumber,
-              firstItem.productName,
-              order.totalAmount,
-              clientUrl
-            ).catch((err) => console.warn(`⚠️ Gagal kirim WA order success #${orderNumber}:`, err.message));
+            // Kirim 1 pesan WhatsApp resmi & lengkap bahwa pembayaran sukses & akun digital siap jika ada nomor WA
+            if (order.customerPhone && !order.customerPhone.startsWith("discord:")) {
+              sendOrderSuccessNotification(
+                order.customerPhone,
+                orderNumber,
+                firstItem.productName,
+                order.totalAmount,
+                clientUrl
+              ).catch((err) => console.warn(`⚠️ Gagal kirim WA order success #${orderNumber}:`, err.message));
+            }
           } else {
             // Supplier masih memproses antrean pembuatan akun
             // Simpan record delivery dengan status "processing" agar UI pelanggan menampilkan status tunggu dan auto-poll
@@ -439,14 +472,18 @@ export class OrderService {
           })
           .where(eq(orders.id, order.id));
 
-        // Kirim 1 pesan WhatsApp resmi & lengkap bahwa pesanan siap
-        sendOrderSuccessNotification(
-          order.customerPhone,
-          order.orderNumber,
-          firstItem?.productName || "Produk Digital",
-          order.totalAmount,
-          clientUrl
-        ).catch((err) => console.warn(`⚠️ Gagal kirim WA fallback success #${order.orderNumber}:`, err.message));
+        this.notifyDiscordBotIfConfigured(order.id, order.orderNumber, order.discordUserId);
+
+        // Kirim 1 pesan WhatsApp resmi & lengkap bahwa pesanan siap jika ada nomor WA
+        if (order.customerPhone && !order.customerPhone.startsWith("discord:")) {
+          sendOrderSuccessNotification(
+            order.customerPhone,
+            order.orderNumber,
+            firstItem?.productName || "Produk Digital",
+            order.totalAmount,
+            clientUrl
+          ).catch((err) => console.warn(`⚠️ Gagal kirim WA fallback success #${order.orderNumber}:`, err.message));
+        }
       }
     } catch (autoOrderErr: any) {
       console.error(`❌ Gagal melakukan auto-order ke Premiumku untuk ${orderNumber}:`, autoOrderErr.message);
@@ -619,17 +656,21 @@ export class OrderService {
                 .where(eq(orders.id, order.id));
 
               order.status = "completed";
+              this.notifyDiscordBotIfConfigured(order.id, order.orderNumber, order.discordUserId);
+
               console.log(`✅ Akun Premku berhasil disinkronkan ke delivery pesanan #${order.orderNumber}! (${statusRes.accounts.length} akun)`);
 
-              // Kirim notifikasi WhatsApp bahwa akun digital siap diakses
+              // Kirim notifikasi WhatsApp bahwa akun digital siap diakses jika ada nomor WA
               const clientUrl = process.env.FRONTEND_URL || "http://localhost:5173";
-              sendOrderSuccessNotification(
-                order.customerPhone,
-                order.orderNumber,
-                del.productName || "Produk Digital",
-                order.totalAmount || 0,
-                clientUrl
-              ).catch((err) => console.warn(`⚠️ Gagal kirim WA sync success #${order.orderNumber}:`, err.message));
+              if (order.customerPhone && !order.customerPhone.startsWith("discord:")) {
+                sendOrderSuccessNotification(
+                  order.customerPhone,
+                  order.orderNumber,
+                  del.productName || "Produk Digital",
+                  order.totalAmount || 0,
+                  clientUrl
+                ).catch((err) => console.warn(`⚠️ Gagal kirim WA sync success #${order.orderNumber}:`, err.message));
+              }
             }
           } catch (err: any) {
             console.warn(`Sync delivery accounts failed for invoice ${invoice}:`, err.message);

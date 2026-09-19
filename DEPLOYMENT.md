@@ -138,6 +138,42 @@ FRONTEND_URL=https://domainanda.com
 ```
 *Simpan file dengan menekan `CTRL + O`, `ENTER`, lalu keluar dengan `CTRL + X`.*
 
+### C. Konfigurasi Bot Discord (`bot/.env`)
+```bash
+cp bot/.env.example bot/.env
+nano bot/.env
+```
+Isi kredensial bot dari [Discord Developer Portal](https://discord.com/developers/applications):
+```ini
+# Token dan Client ID dari Discord Developer Portal
+DISCORD_BOT_TOKEN=token_bot_anda_dari_discord_portal
+DISCORD_CLIENT_ID=client_id_aplikasi_anda
+DISCORD_GUILD_ID=   # Kosongkan untuk deploy global, atau isi server ID untuk dev instan
+
+# URL Backend API (gunakan service name internal Docker)
+BACKEND_URL=http://backend:5001/api
+BOT_PORT=5002
+
+STORE_NAME=Nara Digital Store
+ADMIN_WHATSAPP_PHONE=085750231336
+STORE_WEBSITE_URL=https://domainanda.com
+```
+
+> 🤖 **Cara Setup & Invite Bot Discord:**
+> 1. Buka [Discord Developer Portal](https://discord.com/developers/applications) lalu pilih **New Application**.
+> 2. Di tab **Bot**: Buat token (**Reset Token** / **Copy**) dan aktifkan **Message Content Intent** jika diperlukan.
+> 3. Di tab **OAuth2 > URL Generator**:
+>    - Centang Scopes: `bot`, `applications.commands`.
+>    - Centang Bot Permissions: `Send Messages`, `Embed Links`, `Attach Files`, `Read Message History`, `Use Slash Commands`.
+> 4. Salin URL invite yang dihasilkan dan buka di browser untuk memasukkan bot ke server Discord Anda.
+> 5. Daftarkan Slash Commands (`/produk`, `/pesanan-saya`, `/bantuan`):
+>    ```bash
+>    # Langsung via container docker di VPS:
+>    docker compose exec bot npm run deploy-commands
+>    # Atau jika dijalankan lokal/host:
+>    cd bot && npm run deploy-commands
+>    ```
+
 ---
 
 ## 5. Menjalankan Aplikasi (Build & Run)
@@ -152,8 +188,9 @@ docker compose up -d --build
 Docker Compose akan otomatis:
 1. Melakukan build container `backend` (compile TypeScript, download dependencies produksi).
 2. Melakukan build container `frontend` (compile Vite SPA, setup web server Nginx).
-3. Mengonfigurasi internal network `nara-network`.
-4. Mengarahkan traffic port `80` langsung ke Nginx frontend yang merangkap reverse proxy ke backend `/api/*`.
+3. Melakukan build container `bot` (service Discord Bot & Delivery Poller).
+4. Mengonfigurasi internal network `nara-network`.
+5. Mengarahkan traffic port `80` langsung ke Nginx frontend yang merangkap reverse proxy ke backend `/api/*`.
 
 ### Cek Status Container:
 ```bash

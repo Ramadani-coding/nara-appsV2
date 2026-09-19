@@ -5,6 +5,7 @@ import premkuRoutes from "./premku.routes.js";
 import adminRoutes from "./admin.routes.js";
 import orderRoutes from "./order.routes.js";
 import paymentRoutes from "./payment.routes.js";
+import botRoutes from "./bot.routes.js";
 
 const apiRouter = Router();
 
@@ -22,5 +23,6 @@ apiRouter.use("/premku", premkuRoutes);
 apiRouter.use("/admin", adminRoutes);
 apiRouter.use("/orders", orderRoutes);
 apiRouter.use("/payments", paymentRoutes);
+apiRouter.use("/bot", botRoutes);
 
 export default apiRouter;
