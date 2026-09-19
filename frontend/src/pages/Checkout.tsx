@@ -41,6 +41,16 @@ export default function Checkout() {
   const isOutOfStock = !selectedPackage || selectedPackage.stockCount <= 0;
   const selectedModalPrice = selectedPackage?.providerPrice || selectedPackage?.price || 0;
 
+  // Logic deskripsi produk & ketentuan paket
+  const hasPkgDesc = Boolean(selectedPackage?.description && selectedPackage.description.trim().length > 0);
+  const hasSvcDesc = Boolean(service?.description && service.description.trim().length > 0);
+  const boxDescription = hasPkgDesc 
+    ? selectedPackage?.description 
+    : (hasSvcDesc ? service?.description : '');
+  const boxTitle = hasPkgDesc 
+    ? `Ketentuan Paket (${selectedPackage?.name}):` 
+    : 'Deskripsi & Ketentuan Layanan:';
+
   // Status maintenance dari saldo modal supplier riil
   const isSelectedPkgMaintenance = !isOutOfStock && selectedPackage 
     ? (selectedPackage.isMaintenance !== undefined ? selectedPackage.isMaintenance : isMaintenance(selectedModalPrice))
@@ -359,17 +369,15 @@ export default function Checkout() {
 
           {/* Product Description & Service Details */}
           <div className="pt-3 border-t border-dashed border-gray-300 dark:border-gray-700 space-y-2.5">
-            {/* 1. Main Service / Product Description */}
-
-            {/* 2. Package Specific Terms & Information */}
-            {selectedPackage.description && selectedPackage.description !== service.description && (
+            {/* Package Specific Terms & Information / Product Description Box */}
+            {boxDescription && (
               <div className="space-y-1">
                 <div className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-gray-700 dark:text-gray-300">
                   <Sparkles className="w-3.5 h-3.5 text-brand-pink shrink-0" />
-                  <span>Ketentuan Paket ({selectedPackage.name}):</span>
+                  <span>{boxTitle}</span>
                 </div>
                 <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed font-medium bg-white/90 dark:bg-black/25 p-3 rounded-xl border border-black/10 dark:border-gray-700 whitespace-pre-line">
-                  {selectedPackage.description}
+                  {boxDescription}
                 </p>
               </div>
             )}
@@ -378,7 +386,7 @@ export default function Checkout() {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1 text-[10px] font-bold text-gray-700 dark:text-gray-300">
               <div className="p-2 bg-white/70 dark:bg-black/20 rounded-lg border border-black/10 dark:border-gray-700 flex items-center gap-1.5 shadow-sm">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                <span className="truncate">Garansi Penuh</span>
+                <span className="truncate">Garansi</span>
               </div>
               <div className="p-2 bg-white/70 dark:bg-black/20 rounded-lg border border-black/10 dark:border-gray-700 flex items-center gap-1.5 shadow-sm">
                 <CheckCircle2 className="w-3.5 h-3.5 text-brand-blue shrink-0" />
@@ -386,7 +394,7 @@ export default function Checkout() {
               </div>
               <div className="p-2 bg-white/70 dark:bg-black/20 rounded-lg border border-black/10 dark:border-gray-700 flex items-center gap-1.5 shadow-sm col-span-2 sm:col-span-1">
                 <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                <span className="truncate">Proses Cepat via WA</span>
+                <span className="truncate">Proses Cepat</span>
               </div>
             </div>
           </div>

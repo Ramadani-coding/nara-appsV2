@@ -42,6 +42,7 @@ function detectServiceIdForProduct(name: string): string {
   if (n.includes('disney')) return 'disney';
   if (n.includes('drama') || n.includes('wetv') || n.includes('dracin')) return 'akses-drama';
   if (n.includes('wink')) return 'wink';
+  if (n.includes('meitu')) return 'meitu';
   if (n.includes('hma') || n.includes('vpn')) return 'hma-vpn';
   if (n.includes('gemini') || n.includes('chatgpt') || n.includes('gpt') || n.includes('claude')) return 'aplikasi-ai';
   if (n.includes('iqiyi') || n.includes('iqw')) return 'iqiyi';
@@ -54,6 +55,7 @@ function createServiceForProduct(serviceId: string, rawItem: any): ServiceProduc
   const rawName = String(rawItem.name || '');
   let serviceName = rawName.split(/[\s_-]+/)[0];
   if (serviceId === 'iqiyi') serviceName = 'iQIYI Premium';
+  if (serviceId === 'meitu') serviceName = 'Meitu';
 
   const categoryName = rawItem.category?.name || '';
   let category: 'Desain' | 'Musik & Video' | 'Lainnya' = 'Musik & Video';
@@ -68,6 +70,19 @@ function createServiceForProduct(serviceId: string, rawItem: any): ServiceProduc
     categorySlug = 'lainnya';
   }
 
+  // Deskripsi umum tingkat layanan (bukan sekadar catatan varian/paket individual)
+  let generalDescription = `Layanan langganan premium ${serviceName} resmi, aktif instan dan bergaransi penuh.`;
+  if (serviceId === 'meitu') {
+    generalDescription = 'Aplikasi edit foto, retouch AI dan filter wajah profesional Meitu VIP resmi. Aktif instan dan bergaransi penuh.';
+  } else if (
+    rawItem.description && 
+    !rawItem.description.toLowerCase().includes('device') && 
+    !rawItem.description.toLowerCase().includes('garansi') && 
+    !rawItem.description.toLowerCase().includes('random')
+  ) {
+    generalDescription = rawItem.description;
+  }
+
   return {
     id: serviceId,
     name: serviceName,
@@ -80,7 +95,7 @@ function createServiceForProduct(serviceId: string, rawItem: any): ServiceProduc
     imageUrl: rawItem.imageUrl || rawItem.image_url || undefined,
     genreTag: category === 'Desain' ? 'DESAIN' : category === 'Lainnya' ? 'PRODUKTIVITAS' : 'STREAMING',
     accountTypeTag: 'VIP & Premium',
-    description: rawItem.description || `Layanan langganan premium ${serviceName} resmi, aktif instan dan bergaransi penuh.`,
+    description: generalDescription,
     packages: [],
     isActive: true,
   };
