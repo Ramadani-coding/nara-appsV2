@@ -215,6 +215,7 @@ export async function handleInteraction(interaction: Interaction) {
             : null;
 
           const expiryText = payment.expiryTime ? formatDate(payment.expiryTime) : "15 Menit";
+          const isSandboxMode = !config.isProduction && Boolean(payment.qrCodeUrl && payment.qrCodeUrl.includes("sandbox"));
 
           const qrisEmbed = new EmbedBuilder()
             .setColor(COLORS.primary)
@@ -241,7 +242,7 @@ export async function handleInteraction(interaction: Interaction) {
                 value: "Setelah pembayaran berhasil diverifikasi, sistem akan langsung mengirimkan detail akun ke **DM Discord** Anda secara privat.",
                 inline: false,
               },
-              ...(payment.qrCodeUrl ? [{
+              ...(isSandboxMode && payment.qrCodeUrl ? [{
                 name: "🧪 URL Simulasi Midtrans Sandbox",
                 value: `Salin URL di bawah ini lalu paste ke simulator Midtrans:\n\`\`\`\n${payment.qrCodeUrl}\n\`\`\``,
                 inline: false,
@@ -265,7 +266,7 @@ export async function handleInteraction(interaction: Interaction) {
               .setStyle(ButtonStyle.Primary),
           ];
 
-          if (payment.qrCodeUrl) {
+          if (isSandboxMode) {
             actionButtons.push(
               new ButtonBuilder()
                 .setLabel("🧪 Buka Simulator Midtrans")

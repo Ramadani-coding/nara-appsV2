@@ -10,6 +10,7 @@ export interface BotConfig {
   storeName: string;
   adminPhone: string;
   storeUrl: string;
+  isProduction: boolean;
 }
 
 export const config: BotConfig = {
@@ -21,4 +22,5 @@ export const config: BotConfig = {
   storeName: process.env.STORE_NAME || "Nara Digital Store",
   adminPhone: process.env.ADMIN_WHATSAPP_PHONE || "085750231336",
   storeUrl: process.env.STORE_WEBSITE_URL || "http://localhost:5173",
+  isProduction: process.env.NODE_ENV === "production",
 };
