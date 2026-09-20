@@ -82,7 +82,18 @@ export default function AdminDashboard() {
     }).format(num);
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, order?: any) => {
+    const payment = order?.payments?.[0];
+    const raw = payment?.rawCallback;
+    const payStatus = (payment?.status || raw?.transaction_status || "").toLowerCase();
+    if (payStatus === "expire" || payStatus === "expired" || /expire/i.test(raw?.status_message || "")) {
+      return (
+        <span className="px-2 py-0.5 bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 font-extrabold text-[10px] uppercase border border-black dark:border-gray-700 shadow-[1px_1px_0px_#000] rounded">
+          Expired
+        </span>
+      );
+    }
+
     switch (status) {
       case "completed":
         return (
@@ -308,7 +319,7 @@ export default function AdminDashboard() {
                         {formatRupiah(order.totalAmount)}
                       </td>
                       <td className="py-3 px-2 whitespace-nowrap">
-                        {getStatusBadge(order.status)}
+                        {getStatusBadge(order.status, order)}
                       </td>
                       <td className="py-3 px-2 text-right whitespace-nowrap">
                         <Link
@@ -343,7 +354,7 @@ export default function AdminDashboard() {
                     <span className="font-mono font-black text-xs text-black dark:text-white">
                       {order.orderNumber}
                     </span>
-                    {getStatusBadge(order.status)}
+                    {getStatusBadge(order.status, order)}
                   </div>
 
                   <div className="text-xs space-y-0.5">

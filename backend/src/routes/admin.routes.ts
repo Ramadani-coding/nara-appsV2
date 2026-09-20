@@ -260,7 +260,7 @@ router.get("/orders", async (req: Request, res: Response) => {
   try {
     const { status, search } = req.query;
 
-    let query = db.query.orders.findMany({
+    let allOrders = await db.query.orders.findMany({
       orderBy: [desc(orders.createdAt)],
       with: {
         items: true,
@@ -269,13 +269,47 @@ router.get("/orders", async (req: Request, res: Response) => {
       },
     });
 
-    const allOrders = await query;
+    // Otomatis sinkronkan status asli dari Midtrans secara real-time untuk pesanan waiting_payment
+    const waitingOrders = allOrders.filter(o => o.status === "waiting_payment");
+    if (waitingOrders.length > 0) {
+      let anyChanged = false;
+      await Promise.allSettled(
+        waitingOrders.map(async (o) => {
+          try {
+            const synced = await orderService.syncOrderStatusWithMidtrans(o.orderNumber, false);
+            if (synced && synced.status !== o.status) {
+              anyChanged = true;
+            }
+          } catch (err: any) {
+            console.warn(`Gagal sync Midtrans untuk pesanan ${o.orderNumber}:`, err.message);
+          }
+        })
+      );
+
+      if (anyChanged) {
+        allOrders = await db.query.orders.findMany({
+          orderBy: [desc(orders.createdAt)],
+          with: {
+            items: true,
+            payments: true,
+            deliveries: true,
+          },
+        });
+      }
+    }
 
     // Filter di memori untuk fleksibilitas query Drizzle
     let filtered = allOrders;
 
     if (status && typeof status === "string" && status !== "all") {
-      filtered = filtered.filter(o => o.status === status);
+      if (status === "expired" || status === "expire") {
+        filtered = filtered.filter(o => 
+          o.status === "failed" && 
+          o.payments?.some(p => p.status === "expire" || (p.rawCallback as any)?.transaction_status === "expire")
+        );
+      } else {
+        filtered = filtered.filter(o => o.status === status);
+      }
     }
 
     if (search && typeof search === "string" && search.trim() !== "") {
@@ -329,8 +363,18 @@ router.get("/orders/:id", async (req: Request, res: Response) => {
       return;
     }
 
+    // Jika pesanan masih waiting_payment, sinkronkan real-time dengan Midtrans
+    if (order.status === "waiting_payment") {
+      try {
+        const synced = await orderService.syncOrderStatusWithMidtrans(order.orderNumber, true);
+        if (synced) order = synced;
+      } catch (err: any) {
+        console.warn(`Gagal sync Midtrans saat get order detail ${id}:`, err.message);
+      }
+    }
+
     // Auto-sync delivery accounts dari provider jika masih pending atau processing
-    if (order.status === "paid" || order.status === "processing" || order.status === "completed") {
+    if (order && (order.status === "paid" || order.status === "processing" || order.status === "completed")) {
       try {
         await orderService.syncDeliveryAccountsIfPending(order);
         const fresh = await db.query.orders.findFirst({

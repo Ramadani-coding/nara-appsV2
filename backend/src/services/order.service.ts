@@ -566,7 +566,7 @@ export class OrderService {
             // Eksekusi pemrosesan pembayaran dan pesanan
             const res = await this.handlePaymentSettlement(orderNumber, midtransStatus.raw);
             return this.attachExpiryToOrder(res.order);
-          } else if (txStatus === "expire" || txStatus === "cancel") {
+          } else if (txStatus === "expire" || txStatus === "cancel" || txStatus === "deny") {
             await this.handlePaymentFailure(orderNumber, txStatus, midtransStatus.raw);
             const updated = await db.query.orders.findFirst({
               where: eq(orders.id, order.id),
@@ -577,6 +577,23 @@ export class OrderService {
         } catch (err: any) {
           console.warn(`⚠️ Pengecekan Midtrans status untuk ${orderNumber} tertunda:`, err.message);
         }
+      }
+
+      // Cek apakah batas waktu QRIS (expiry_time) sudah kadaluarsa secara riil
+      const latestPayment = order.payments && order.payments.length > 0 ? order.payments[order.payments.length - 1] : null;
+      const expiryIso = parseMidtransExpiry(latestPayment?.rawCallback);
+      if (expiryIso && new Date(expiryIso).getTime() < Date.now()) {
+        await this.handlePaymentFailure(orderNumber, "expire", {
+          status_code: "407",
+          transaction_status: "expire",
+          status_message: "Batas waktu pembayaran QRIS telah habis (Expired)",
+          expiry_time: expiryIso,
+        });
+        const updated = await db.query.orders.findFirst({
+          where: eq(orders.id, order.id),
+          with: { items: true, payments: true, deliveries: true },
+        });
+        return this.attachExpiryToOrder(updated);
       }
     }
 

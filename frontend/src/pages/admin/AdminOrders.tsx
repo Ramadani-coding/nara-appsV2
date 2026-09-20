@@ -5,6 +5,7 @@ import {
   Search, 
   RefreshCw, 
   CheckCircle2, 
+  XCircle,
   Clock, 
   AlertCircle, 
   X, 
@@ -120,6 +121,53 @@ interface FailureReasonInfo {
   code?: string;
 }
 
+function DiscordIcon({ className = "w-3.5 h-3.5" }: { className?: string }) {
+  return (
+    <svg className={`${className} fill-current`} viewBox="0 0 24 24">
+      <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.893.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+    </svg>
+  );
+}
+
+function isDiscordOrder(order?: { customerPhone?: string | null; discordUserId?: string | null } | null): boolean {
+  if (!order) return false;
+  if (order.discordUserId && String(order.discordUserId).trim()) return true;
+  if (order.customerPhone && String(order.customerPhone).toLowerCase().startsWith("discord:")) return true;
+  return false;
+}
+
+function isOrderExpired(order?: Order | null): boolean {
+  if (!order) return false;
+
+  const payment = order.payments && order.payments.length > 0
+    ? order.payments[order.payments.length - 1]
+    : null;
+  const raw = payment?.rawCallback;
+  const payStatus = (payment?.status || raw?.transaction_status || "").toLowerCase();
+
+  if (payStatus === "expire" || payStatus === "expired") return true;
+  if (/expire/i.test(raw?.status_message || "")) return true;
+
+  if (order.status === "waiting_payment") {
+    const expStr = raw?.expiry_time || raw?.expiryTime || (payment as any)?.expiryTime;
+    if (expStr) {
+      try {
+        let expDate: Date;
+        if (typeof expStr === "string" && !expStr.includes("T")) {
+          expDate = new Date(expStr.trim().replace(" ", "T") + "+07:00");
+        } else {
+          expDate = new Date(expStr);
+        }
+        if (!isNaN(expDate.getTime()) && expDate.getTime() < Date.now()) {
+          return true;
+        }
+      } catch {}
+    }
+  }
+
+  return false;
+}
+
 function formatWhatsAppUrl(rawPhone: string, orderNumber?: string): string {
   let clean = String(rawPhone || "").replace(/\D/g, "");
   if (clean.startsWith("0")) {
@@ -136,7 +184,7 @@ function formatWhatsAppUrl(rawPhone: string, orderNumber?: string): string {
 }
 
 function getOrderFailureReason(order: Order): FailureReasonInfo | null {
-  if (order.status !== "failed") return null;
+  if (order.status !== "failed" && !isOrderExpired(order)) return null;
 
   const payment = order.payments && order.payments.length > 0
     ? order.payments[order.payments.length - 1]
@@ -148,10 +196,10 @@ function getOrderFailureReason(order: Order): FailureReasonInfo | null {
   const statusMessage = raw?.status_message;
 
   // 1. Expired / Kadaluarsa di Midtrans
-  if (payStatus === "expire" || /expire/i.test(statusMessage || "")) {
+  if (payStatus === "expire" || payStatus === "expired" || /expire/i.test(statusMessage || "") || isOrderExpired(order)) {
     return {
       category: "MIDTRANS_EXPIRED",
-      badge: "KADALUARSA",
+      badge: "EXPIRED",
       title: "Batas Waktu Pembayaran Habis (QRIS Expired)",
       description: "Pelanggan tidak menyelesaikan transfer pembayaran QRIS sebelum batas waktu habis. Transaksi otomatis kadaluarsa di Midtrans dan QRIS dinonaktifkan.",
       code: statusCode || "407",
@@ -232,6 +280,7 @@ interface Order {
   items: OrderItem[];
   payments: Payment[];
   deliveries: Delivery[];
+  discordUserId?: string | null;
 }
 
 export default function AdminOrders() {
@@ -425,10 +474,20 @@ export default function AdminOrders() {
     { key: "paid", label: "Lunas" },
     { key: "processing", label: "Diproses" },
     { key: "completed", label: "Selesai" },
-    { key: "failed", label: "Gagal" },
+    { key: "failed", label: "Gagal / Expired" },
   ];
 
   const getStatusBadge = (status: string, order?: Order) => {
+    // Cek jika pesanan terdeteksi Expired dari Midtrans
+    if (order && isOrderExpired(order)) {
+      return (
+        <span className="px-2.5 py-1 bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 font-extrabold text-xs uppercase border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] rounded-lg inline-flex items-center gap-1">
+          <XCircle className="w-3 h-3" />
+          <span>Expired</span>
+        </span>
+      );
+    }
+
     switch (status) {
       case "completed":
         return (
@@ -583,20 +642,30 @@ export default function AdminOrders() {
                       {order.orderNumber}
                     </td>
                     <td className="py-3.5 px-4">
-                      <div className="font-bold text-black dark:text-white flex items-center gap-1.5">
-                        <Phone className="w-3 h-3 text-emerald-600 shrink-0" />
-                        <a
-                          href={formatWhatsAppUrl(order.customerPhone, order.orderNumber)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="hover:text-emerald-600 hover:underline inline-flex items-center gap-1 text-xs"
-                          title="Hubungi via WhatsApp"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <span>{order.customerPhone}</span>
-                          <ExternalLink className="w-2.5 h-2.5 opacity-60 hover:opacity-100 shrink-0" />
-                        </a>
-                      </div>
+                      {isDiscordOrder(order) ? (
+                        <div className="font-bold text-black dark:text-white flex items-center gap-1.5">
+                          <DiscordIcon className="w-3.5 h-3.5 text-[#5865F2] shrink-0" />
+                          <span className="text-xs font-mono text-[#5865F2] dark:text-[#7983f5]">{order.customerPhone}</span>
+                          <span className="px-1.5 py-0.5 bg-[#5865F2]/10 text-[#5865F2] dark:text-[#7983f5] border border-[#5865F2]/30 text-[9px] font-black uppercase rounded">
+                            Discord
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="font-bold text-black dark:text-white flex items-center gap-1.5">
+                          <Phone className="w-3 h-3 text-emerald-600 shrink-0" />
+                          <a
+                            href={formatWhatsAppUrl(order.customerPhone, order.orderNumber)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:text-emerald-600 hover:underline inline-flex items-center gap-1 text-xs"
+                            title="Hubungi via WhatsApp"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <span>{order.customerPhone}</span>
+                            <ExternalLink className="w-2.5 h-2.5 opacity-60 hover:opacity-100 shrink-0" />
+                          </a>
+                        </div>
+                      )}
                       {order.customerEmail && (
                         <div className="text-[11px] text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-0.5">
                           <Mail className="w-3 h-3 text-gray-400 shrink-0" />
@@ -683,30 +752,42 @@ export default function AdminOrders() {
 
               {/* Customer Contact */}
               <div className="bg-gray-50 dark:bg-[#12141C] p-3 rounded-xl border border-gray-200 dark:border-gray-800 space-y-1 text-xs">
-                <div className="font-bold flex items-center justify-between gap-1.5 text-black dark:text-white">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <Phone className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                {isDiscordOrder(order) ? (
+                  <div className="font-bold flex items-center justify-between gap-1.5 text-black dark:text-white">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <DiscordIcon className="w-3.5 h-3.5 text-[#5865F2] shrink-0" />
+                      <span className="font-mono text-[#5865F2] dark:text-[#7983f5] truncate">{order.customerPhone}</span>
+                    </div>
+                    <span className="px-2 py-0.5 bg-[#5865F2]/10 text-[#5865F2] dark:text-[#7983f5] border border-[#5865F2]/30 font-black text-[9px] uppercase rounded shrink-0">
+                      Discord
+                    </span>
+                  </div>
+                ) : (
+                  <div className="font-bold flex items-center justify-between gap-1.5 text-black dark:text-white">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Phone className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <a
+                        href={formatWhatsAppUrl(order.customerPhone, order.orderNumber)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-emerald-600 hover:underline inline-flex items-center gap-1 truncate font-mono"
+                        title="Hubungi via WhatsApp"
+                      >
+                        <span>{order.customerPhone}</span>
+                        <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
+                      </a>
+                    </div>
                     <a
                       href={formatWhatsAppUrl(order.customerPhone, order.orderNumber)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="hover:text-emerald-600 hover:underline inline-flex items-center gap-1 truncate font-mono"
-                      title="Hubungi via WhatsApp"
+                      className="px-2 py-0.5 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-[9px] uppercase rounded border border-black shadow-[1px_1px_0px_#000] shrink-0 inline-flex items-center gap-1"
                     >
-                      <span>{order.customerPhone}</span>
-                      <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
+                      <MessageCircle className="w-2.5 h-2.5" />
+                      <span>Chat WA</span>
                     </a>
                   </div>
-                  <a
-                    href={formatWhatsAppUrl(order.customerPhone, order.orderNumber)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-2 py-0.5 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-[9px] uppercase rounded border border-black shadow-[1px_1px_0px_#000] shrink-0 inline-flex items-center gap-1"
-                  >
-                    <MessageCircle className="w-2.5 h-2.5" />
-                    <span>Chat WA</span>
-                  </a>
-                </div>
+                )}
                 {order.customerEmail && (
                   <div className="text-[11px] text-gray-500 dark:text-gray-400 flex items-center gap-1.5 truncate">
                     <Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" />
@@ -816,32 +897,47 @@ export default function AdminOrders() {
                   <div className="text-[10px] font-black uppercase text-gray-500 tracking-wider">
                     DATA PEMBELI
                   </div>
-                  <div className="text-xs font-bold flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <Phone className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span className="text-gray-700 dark:text-gray-300">WhatsApp:</span>
+                  {isDiscordOrder(selectedOrder) ? (
+                    <div className="text-xs font-bold flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <DiscordIcon className="w-3.5 h-3.5 text-[#5865F2] shrink-0" />
+                        <span className="text-gray-700 dark:text-gray-300">Discord:</span>
+                        <span className="font-mono text-[#5865F2] dark:text-[#7983f5] truncate">
+                          {selectedOrder.customerPhone}
+                        </span>
+                      </div>
+                      <span className="px-2.5 py-0.5 bg-[#5865F2]/10 text-[#5865F2] dark:text-[#7983f5] border border-[#5865F2]/30 font-black text-[10px] uppercase rounded shrink-0">
+                        Pembelian Discord
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="text-xs font-bold flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <Phone className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span className="text-gray-700 dark:text-gray-300">WhatsApp:</span>
+                        <a
+                          href={formatWhatsAppUrl(selectedOrder.customerPhone, selectedOrder.orderNumber)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-mono text-emerald-600 dark:text-emerald-400 hover:underline inline-flex items-center gap-1"
+                          title="Klik untuk chat WhatsApp"
+                        >
+                          <span>{selectedOrder.customerPhone}</span>
+                          <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                        </a>
+                      </div>
                       <a
                         href={formatWhatsAppUrl(selectedOrder.customerPhone, selectedOrder.orderNumber)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="font-mono text-emerald-600 dark:text-emerald-400 hover:underline inline-flex items-center gap-1"
-                        title="Klik untuk chat WhatsApp"
+                        className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-[10px] uppercase rounded border border-black shadow-[1.5px_1.5px_0px_#000] hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none transition-all cursor-pointer inline-flex items-center gap-1 shrink-0"
+                        title="Hubungi pembeli via WhatsApp"
                       >
-                        <span>{selectedOrder.customerPhone}</span>
-                        <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                        <MessageCircle className="w-3 h-3" />
+                        <span>Chat WA</span>
                       </a>
                     </div>
-                    <a
-                      href={formatWhatsAppUrl(selectedOrder.customerPhone, selectedOrder.orderNumber)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-[10px] uppercase rounded border border-black shadow-[1.5px_1.5px_0px_#000] hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none transition-all cursor-pointer inline-flex items-center gap-1 shrink-0"
-                      title="Hubungi pembeli via WhatsApp"
-                    >
-                      <MessageCircle className="w-3 h-3" />
-                      <span>Chat WA</span>
-                    </a>
-                  </div>
+                  )}
                   <div className="text-xs font-bold flex items-center gap-1.5">
                     <Mail className="w-3.5 h-3.5 text-brand-blue" />
                     <span>Email: {selectedOrder.customerEmail || "Tidak ada email"}</span>
@@ -863,7 +959,7 @@ export default function AdminOrders() {
               </div>
 
               {/* Box Detail Alasan Kegagalan Pesanan */}
-              {selectedOrder.status === 'failed' && (() => {
+              {(selectedOrder.status === 'failed' || isOrderExpired(selectedOrder)) && (() => {
                 const failureInfo = getOrderFailureReason(selectedOrder);
                 const payment = selectedOrder.payments && selectedOrder.payments.length > 0
                   ? selectedOrder.payments[selectedOrder.payments.length - 1]
