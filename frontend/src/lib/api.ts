@@ -429,3 +429,30 @@ export async function simulateBackendPayment(orderNumber: string): Promise<any> 
   return json.data;
 }
 
+export interface RecentSale {
+  id: number;
+  phone: string;
+  product: string;
+  time: string;
+}
+
+/**
+ * Mengambil transaksi penjualan riil terakhir untuk social proof yang jujur & terverifikasi
+ */
+export async function fetchRecentSales(): Promise<RecentSale[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/orders/recent-sales`, {
+      headers: { Accept: "application/json" },
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        return json.data;
+      }
+    }
+  } catch (_err) {
+    // API backend belum aktif / offline
+  }
+  return [];
+}
+

@@ -58,6 +58,57 @@ function resetAttempts(key: string) {
   verificationAttempts.delete(key);
 }
 
+function formatTimeAgo(dateInput: Date | string | null): string {
+  if (!dateInput) return "Baru saja";
+  const date = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
+  const now = new Date();
+  const diffSec = Math.max(0, Math.floor((now.getTime() - date.getTime()) / 1000));
+
+  if (diffSec < 60) return "Baru saja";
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin} menit lalu`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour} jam lalu`;
+  const diffDay = Math.floor(diffHour / 24);
+  return `${diffDay} hari lalu`;
+}
+
+/**
+ * GET /api/orders/recent-sales
+ * Mengambil transaksi riil terkini yang sukses (paid/completed) untuk social proof yang jujur & transparan.
+ */
+router.get("/recent-sales", async (_req: Request, res: Response) => {
+  try {
+    const recentOrders = await db.query.orders.findMany({
+      where: or(eq(orders.status, "paid"), eq(orders.status, "completed")),
+      orderBy: [desc(orders.createdAt)],
+      limit: 8,
+      with: {
+        items: true,
+      },
+    });
+
+    const data = recentOrders.map((order) => ({
+      id: order.id,
+      phone: maskPhoneNumber(order.customerPhone),
+      product: order.items?.[0]?.productName || "Produk Digital",
+      time: formatTimeAgo(order.createdAt),
+    }));
+
+    res.json({
+      success: true,
+      data,
+    });
+  } catch (error: any) {
+    console.error("Error fetching recent sales:", error);
+    res.status(500).json({
+      success: false,
+      data: [],
+      message: "Gagal mengambil data transaksi terkini",
+    });
+  }
+});
+
 /**
  * POST /api/orders/validate-phone
  * Memvalidasi nomor WhatsApp pemesan dengan filter operator seluler Indonesia dan Fonnte API

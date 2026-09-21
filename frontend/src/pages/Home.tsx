@@ -7,8 +7,7 @@ import {
   Zap, 
   Star, 
   MessageCircle, 
-  ArrowRight,
-  Sparkles
+  ArrowRight
 } from 'lucide-react';
 import { CATEGORIES, type ServiceProduct } from '../lib/mockData';
 import { useLiveServices } from '../lib/useLiveCatalog';
@@ -38,7 +37,7 @@ export default function Home() {
   return (
     <div className="space-y-16 pb-16 text-black">
       {/* ========================================================
-          HERO SECTION (Matching Reference Image 2)
+          HERO SECTION
          ======================================================== */}
       <section className="pt-4 pb-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
@@ -46,27 +45,26 @@ export default function Home() {
           {/* Left Hero Content */}
           <div className="lg:col-span-7 space-y-6">
             
-            {/* Pill Tag */}
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-brand-yellow border-2 border-black shadow-[2px_2px_0px_#000] font-black text-xs uppercase tracking-wider">
-              <span className="w-2 h-2 rounded-full bg-black animate-ping" />
-              <span>DIGITAL STORE</span>
+            {/* Trust & Guarantee Tag */}
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-brand-yellow border-2 border-black shadow-[2px_2px_0px_#000] font-black text-xs uppercase tracking-wider">
+              <ShieldCheck className="w-4 h-4 text-black" />
+              <span>PROSES OTOMATIS 24/7</span>
             </div>
 
             {/* Headline */}
             <div className="space-y-1">
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-black leading-tight">
-                Premium
+                Langganan Premium
               </h1>
-              <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-brand-blue leading-tight flex items-center gap-2">
-                <span>Digital Products</span>
-                <Sparkles className="w-8 h-8 text-brand-pink fill-brand-pink" />
+              <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-brand-blue leading-tight">
+                Aplikasi Digital Favorit
               </h2>
             </div>
 
             {/* Sub-headline */}
             <p className="text-base sm:text-lg text-gray-800 font-medium max-w-xl leading-relaxed">
-              Temukan berbagai produk premium digital dengan harga terjangkau. Pilih produk, 
-              masukkan data pemesan, dan lanjutkan order dengan proses yang praktis.
+              Akses premium resmi untuk kebutuhan streaming, produktivitas, dan editing dengan harga terjangkau. 
+              Pembayaran instan via QRIS dan garansi penggantian selama masa aktif.
             </p>
 
             {/* CTA Action Buttons */}
@@ -87,26 +85,28 @@ export default function Home() {
               </button>
             </div>
 
-            {/* Social Proof Stats (3 Neo-Brutalist Boxes) */}
+            {/* Verifiable Stats & Value Props */}
             <div className="grid grid-cols-3 gap-3 sm:gap-4 pt-6 max-w-lg">
               <div className="p-3 sm:p-4 bg-white border-2 border-black shadow-[3px_3px_0px_#000]">
-                <div className="text-2xl sm:text-3xl font-black text-black">22+</div>
+                <div className="text-2xl sm:text-3xl font-black text-black">
+                  {services.length > 0 ? `${services.length}+` : '20+'}
+                </div>
                 <div className="text-[10px] sm:text-xs font-extrabold uppercase text-gray-600 tracking-wider">
-                  TOTAL PRODUK
+                  PILIHAN PRODUK
                 </div>
               </div>
 
               <div className="p-3 sm:p-4 bg-white border-2 border-black shadow-[3px_3px_0px_#000]">
-                <div className="text-2xl sm:text-3xl font-black text-black">1K+</div>
+                <div className="text-2xl sm:text-3xl font-black text-brand-blue">100%</div>
                 <div className="text-[10px] sm:text-xs font-extrabold uppercase text-gray-600 tracking-wider">
-                  CUSTOMER
+                  GARANSI RESMI
                 </div>
               </div>
 
               <div className="p-3 sm:p-4 bg-white border-2 border-black shadow-[3px_3px_0px_#000]">
-                <div className="text-2xl sm:text-3xl font-black text-black">24/7</div>
+                <div className="text-2xl sm:text-3xl font-black text-emerald-600">24/7</div>
                 <div className="text-[10px] sm:text-xs font-extrabold uppercase text-gray-600 tracking-wider">
-                  ORDER ONLINE
+                  SISTEM OTOMATIS
                 </div>
               </div>
             </div>
@@ -123,8 +123,8 @@ export default function Home() {
               {/* Tilted bottom-left pink decorative rectangle */}
               <div className="absolute -bottom-4 -left-3 w-28 h-28 bg-brand-pink border-2 border-black -rotate-12 -z-10 shadow-[2px_2px_0px_#000]" />
 
-              {/* Main Neo-Brutalist Card */}
-              <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-brand-pink p-6 sm:p-8 border-2 border-black shadow-[6px_6px_0px_0px_#000000] text-white relative overflow-hidden">
+              {/* Main Neo-Brutalist Card with Crisp Brand Blue */}
+              <div className="bg-brand-blue p-6 sm:p-8 border-2 border-black shadow-[6px_6px_0px_0px_#000000] text-white relative overflow-hidden">
                 
                 {/* Top Badge Row */}
                 <div className="flex justify-between items-start mb-12">

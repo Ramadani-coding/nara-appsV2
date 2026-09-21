@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Outlet } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Outlet, Navigate } from "react-router-dom";
 import { Navbar } from "./components/layout/Navbar";
 import { Footer } from "./components/layout/Footer";
 import Home from "./pages/Home";
@@ -10,6 +10,7 @@ import InvoiceDetail from "./pages/InvoiceDetail";
 import PriceList from "./pages/PriceList";
 import TermsAndConditions from "./pages/TermsAndConditions";
 import WarrantyPolicy from "./pages/WarrantyPolicy";
+import NotFound from "./pages/NotFound";
 import { ScrollToTop } from "./components/ScrollToTop";
 
 import { AdminAuthProvider } from "./context/AdminAuthContext";
@@ -45,6 +46,8 @@ function App() {
         <Routes>
           {/* Admin Login Route (Standalone) */}
           <Route path="/admin/login" element={<AdminLogin />} />
+          {/* Quick Alias / Redirect for /login to Admin Login */}
+          <Route path="/login" element={<Navigate to="/admin/login" replace />} />
 
           {/* Protected Admin Routes under AdminGuard & AdminLayout */}
           <Route path="/admin" element={<AdminGuard />}>
@@ -72,6 +75,8 @@ function App() {
             <Route path="/kebijakan-garansi" element={<WarrantyPolicy />} />
             <Route path="/garansi" element={<WarrantyPolicy />} />
             <Route path="/warranty" element={<WarrantyPolicy />} />
+            {/* 404 Catch-All Route */}
+            <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>
       </Router>
