@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { db } from "../db/index.js";
 import { orders, orderItems, payments, deliveries, products } from "../db/schema.js";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, and, gte, lt } from "drizzle-orm";
 import { midtransService } from "./midtrans.service.js";
 import { premiumkuService } from "./premiumku.service.js";
 import { 
@@ -174,10 +174,6 @@ export class OrderService {
       throw new Error("Produk ini sedang dinonaktifkan oleh administrator.");
     }
 
-    if (dbProduct.stockStatus === "empty" || (typeof dbProduct.stockCount === "number" && dbProduct.stockCount < qty)) {
-      throw new Error("Stok produk tidak mencukupi untuk jumlah yang Anda minta.");
-    }
-
     // Keamanan Finansial: Nama & Harga Jual WAJIB 100% dari database lokal toko! Tolak harga dari klien!
     const productName = dbProduct.name;
     const unitPrice = dbProduct.price;
@@ -186,40 +182,69 @@ export class OrderService {
       throw new Error("Harga produk pada sistem database tidak valid.");
     }
 
+    // 2. ATOMIC STOCK RESERVATION (PostgreSQL Row-Level Lock)
+    // Mencegah race condition / over-selling dengan satu query SQL atomik:
+    // UPDATE products SET stock_count = stock_count - qty WHERE id = ? AND stock_count >= qty
+    const [reservedProduct] = await db
+      .update(products)
+      .set({
+        stockCount: sql`${products.stockCount} - ${qty}`,
+        stockStatus: sql`CASE WHEN ${products.stockCount} - ${qty} <= 0 THEN 'empty' ELSE 'available' END`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(products.id, dbProduct.id),
+          gte(products.stockCount, qty),
+          eq(products.isActive, true)
+        )
+      )
+      .returning({ id: products.id, stockCount: products.stockCount });
+
+    if (!reservedProduct) {
+      throw new Error("Maaf, stok produk tidak mencukupi atau baru saja habis dibeli pelanggan lain.");
+    }
+
+    console.log(`🔒 [AtomicReservation] Berhasil reservasi stok ${qty} unit untuk produk #${dbProduct.id} (${productName}). Sisa stok: ${reservedProduct.stockCount}`);
+
     const totalAmount = unitPrice * qty;
 
-    // 2. Generate Nomor Order dan Ref ID yang unik
+    // 3. Generate Nomor Order dan Ref ID yang unik
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);
     const orderNumber = `ORD-${Date.now().toString().slice(-6)}${randomSuffix}`;
     const refId = `REF-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
-    // 3. Simpan Pesanan ke database (status: waiting_payment)
-    const [newOrder] = await db
-      .insert(orders)
-      .values({
-        orderNumber,
-        refId,
-        customerPhone: resolvedPhone,
-        customerEmail: params.customerEmail?.trim() || null,
-        discordUserId: params.discordUserId?.trim() || null,
-        status: "waiting_payment",
-        totalAmount,
-      })
-      .returning();
-
-    // 4. Simpan Item Pesanan
-    await db.insert(orderItems).values({
-      orderId: newOrder.id,
-      productId: dbProduct?.id || null,
-      productName,
-      price: unitPrice,
-      quantity: qty,
-      subtotal: totalAmount,
-    });
-
-    // 5. Buat transaksi QRIS di Midtrans Core API
+    let newOrder: any = null;
+    let paymentRecord: any = null;
     let qrisCharge: any = null;
+
     try {
+      // 4. Simpan Pesanan ke database (status: waiting_payment)
+      const [insertedOrder] = await db
+        .insert(orders)
+        .values({
+          orderNumber,
+          refId,
+          customerPhone: resolvedPhone,
+          customerEmail: params.customerEmail?.trim() || null,
+          discordUserId: params.discordUserId?.trim() || null,
+          status: "waiting_payment",
+          totalAmount,
+        })
+        .returning();
+      newOrder = insertedOrder;
+
+      // 5. Simpan Item Pesanan
+      await db.insert(orderItems).values({
+        orderId: newOrder.id,
+        productId: dbProduct?.id || null,
+        productName,
+        price: unitPrice,
+        quantity: qty,
+        subtotal: totalAmount,
+      });
+
+      // 6. Buat transaksi QRIS di Midtrans Core API
       qrisCharge = await midtransService.createQrisCharge({
         orderNumber: newOrder.orderNumber,
         grossAmount: totalAmount,
@@ -234,28 +259,48 @@ export class OrderService {
           },
         ],
       });
-    } catch (midtransErr: any) {
-      console.error("❌ Gagal membuat charge QRIS di Midtrans:", midtransErr.message);
-      // Update order status ke failed jika charge gagal dibuat
-      await db
-        .update(orders)
-        .set({ status: "failed" })
-        .where(eq(orders.id, newOrder.id));
-      throw new Error(`Gagal membuat pembayaran QRIS: ${midtransErr.message}`);
-    }
 
-    // 6. Simpan transaksi pembayaran ke tabel `payments`
-    const [paymentRecord] = await db
-      .insert(payments)
-      .values({
-        orderId: newOrder.id,
-        transactionId: qrisCharge.transactionId,
-        paymentMethod: "qris",
-        qrCodeUrl: qrisCharge.qrCodeUrl,
-        status: "pending",
-        rawCallback: qrisCharge.raw,
-      })
-      .returning();
+      // 7. Simpan transaksi pembayaran ke tabel `payments`
+      const [insertedPayment] = await db
+        .insert(payments)
+        .values({
+          orderId: newOrder.id,
+          transactionId: qrisCharge.transactionId,
+          paymentMethod: "qris",
+          qrCodeUrl: qrisCharge.qrCodeUrl,
+          status: "pending",
+          rawCallback: qrisCharge.raw,
+        })
+        .returning();
+      paymentRecord = insertedPayment;
+    } catch (err: any) {
+      console.error(`❌ Gagal menyelesaikan pesanan #${orderNumber}:`, err.message);
+
+      // Rollback reservasi stok secara instan jika pembuatan pesanan atau charge QRIS gagal
+      try {
+        await db
+          .update(products)
+          .set({
+            stockCount: sql`${products.stockCount} + ${qty}`,
+            stockStatus: "available",
+            updatedAt: new Date(),
+          })
+          .where(eq(products.id, dbProduct.id));
+        console.log(`🔄 [InstantRollback] Stok dikembalikan (+${qty}) untuk produk ID ${dbProduct.id} karena gagal membuat order/QRIS.`);
+      } catch (restoreErr: any) {
+        console.error("⚠️ Gagal rollback reservasi stok:", restoreErr.message);
+      }
+
+      if (newOrder?.id) {
+        await db
+          .update(orders)
+          .set({ status: "failed" })
+          .where(eq(orders.id, newOrder.id))
+          .catch(() => {});
+      }
+
+      throw new Error(`Gagal membuat pembayaran QRIS: ${err.message}`);
+    }
 
     const accessToken = generateOrderToken(newOrder.orderNumber, newOrder.customerPhone || "");
 
@@ -508,6 +553,9 @@ export class OrderService {
   async handlePaymentFailure(orderNumber: string, failureStatus: string, midtransPayload?: any) {
     const order = await db.query.orders.findFirst({
       where: eq(orders.orderNumber, orderNumber),
+      with: {
+        items: true,
+      },
     });
 
     if (!order) return { success: false, message: "Pesanan tidak ditemukan" };
@@ -516,6 +564,10 @@ export class OrderService {
     if (order.status === "paid" || order.status === "completed") {
       return { success: false, message: "Pesanan sudah lunas, tidak dapat diubah ke failed" };
     }
+
+    // Pastikan hanya me-restore stok satu kali (idempoten) saat transisi dari waiting_payment atau processing
+    const shouldRestoreStock = order.status === "waiting_payment" || order.status === "processing";
+    const mappedStatus = failureStatus === "expire" ? "expired" : failureStatus === "cancel" ? "cancelled" : "failed";
 
     await db
       .update(payments)
@@ -527,10 +579,73 @@ export class OrderService {
 
     await db
       .update(orders)
-      .set({ status: "failed" })
+      .set({ status: mappedStatus })
       .where(eq(orders.id, order.id));
 
-    return { success: true, message: `Pesanan ${orderNumber} diperbarui menjadi failed` };
+    // Auto-restore stok yang sebelumnya di-reserve
+    if (shouldRestoreStock && Array.isArray(order.items) && order.items.length > 0) {
+      for (const item of order.items) {
+        if (item.productId) {
+          try {
+            await db
+              .update(products)
+              .set({
+                stockCount: sql`${products.stockCount} + ${item.quantity}`,
+                stockStatus: "available",
+                updatedAt: new Date(),
+              })
+              .where(eq(products.id, item.productId));
+            console.log(
+              `🔄 [Auto-Restore] Stok dikembalikan (+${item.quantity}) untuk produk ID ${item.productId} karena pesanan #${orderNumber} berstatus '${mappedStatus}'.`
+            );
+          } catch (restoreErr: any) {
+            console.error(`⚠️ Gagal mengembalikan stok untuk item pesanan #${orderNumber}:`, restoreErr.message);
+          }
+        }
+      }
+    }
+
+    return { success: true, message: `Pesanan ${orderNumber} diperbarui menjadi ${mappedStatus}` };
+  }
+
+  /**
+   * Memeriksa dan membatalkan pesanan yang kadaluarsa (stale waiting_payment)
+   * agar stok yang di-reserve otomatis kembali ke katalog jika pembeli menutup browser tanpa bayar
+   */
+  async expireStaleWaitingOrders(): Promise<number> {
+    // Default batas kadaluarsa pesanan yang ditinggalkan: 16 menit yang lalu
+    const sixteenMinutesAgo = new Date(Date.now() - 16 * 60 * 1000);
+
+    const staleOrders = await db.query.orders.findMany({
+      where: and(
+        eq(orders.status, "waiting_payment"),
+        lt(orders.createdAt, sixteenMinutesAgo)
+      ),
+      with: {
+        items: true,
+        payments: true,
+      },
+      limit: 50,
+    });
+
+    if (!staleOrders || staleOrders.length === 0) return 0;
+
+    let expiredCount = 0;
+    for (const order of staleOrders) {
+      try {
+        console.log(`⏱️ [ExpireStale] Membatalkan otomatis pesanan kadaluarsa #${order.orderNumber}...`);
+        await this.handlePaymentFailure(order.orderNumber, "expire", {
+          status_code: "407",
+          transaction_status: "expire",
+          status_message: "Pesanan kadaluarsa otomatis oleh sistem (Auto-Expire)",
+        });
+        expiredCount++;
+      } catch (err: any) {
+        console.warn(`⚠️ Gagal membatalkan pesanan stale #${order.orderNumber}:`, err.message);
+      }
+    }
+
+    return expiredCount;
   }
 
   /**

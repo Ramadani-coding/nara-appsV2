@@ -469,6 +469,16 @@ router.patch("/orders/:id/status", async (req: Request, res: Response) => {
       return;
     }
 
+    const currentOrder = await db.query.orders.findFirst({
+      where: eq(orders.id, id),
+      with: { items: true },
+    });
+
+    if (!currentOrder) {
+      res.status(404).json({ success: false, message: "Pesanan tidak ditemukan" });
+      return;
+    }
+
     const updates: Record<string, any> = { status };
     if (status === "paid") {
       updates.paidAt = new Date();
@@ -482,9 +492,30 @@ router.patch("/orders/:id/status", async (req: Request, res: Response) => {
       .where(eq(orders.id, id))
       .returning();
 
-    if (!updatedOrder) {
-      res.status(404).json({ success: false, message: "Pesanan tidak ditemukan" });
-      return;
+    // Jika pesanan yang tadinya waiting_payment diubah menjadi failed oleh admin,
+    // kembalikan reservasi stok ke etalase produk
+    if (currentOrder.status === "waiting_payment" && status === "failed") {
+      if (Array.isArray(currentOrder.items)) {
+        for (const item of currentOrder.items) {
+          if (item.productId) {
+            try {
+              await db
+                .update(products)
+                .set({
+                  stockCount: sql`${products.stockCount} + ${item.quantity}`,
+                  stockStatus: "available",
+                  updatedAt: new Date(),
+                })
+                .where(eq(products.id, item.productId));
+              console.log(
+                `🔄 [AdminStatus] Stok dikembalikan (+${item.quantity}) untuk produk ID ${item.productId} karena pesanan #${currentOrder.orderNumber} dibatalkan admin.`
+              );
+            } catch (err: any) {
+              console.warn("⚠️ Gagal restore stok oleh admin:", err.message);
+            }
+          }
+        }
+      }
     }
 
     res.json({

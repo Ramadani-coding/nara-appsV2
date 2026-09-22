@@ -1,7 +1,7 @@
 import { db } from "../db/index.js";
-import { productCategories, products } from "../db/schema.js";
+import { productCategories, products, orders, orderItems } from "../db/schema.js";
 import { premiumkuService, type PremiumkuProduct } from "./premiumku.service.js";
-import { eq } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 
 export const DEFAULT_CATEGORIES = [
   { name: "Desain & Kreatif", slug: "desain-kreatif" },
@@ -105,6 +105,27 @@ export class SyncService {
       const providerPrice = item.price;
       const finalPrice = providerPrice + marginValue;
 
+      // Perhitungkan reservasi stok yang sedang aktif (waiting_payment)
+      // agar sinkronisasi supplier tidak menimpa atau membocorkan stok yang sedang di-hold
+      let activeReserved = 0;
+      if (existingProduct) {
+        const [reservedResult] = await db
+          .select({
+            totalReserved: sql<string>`COALESCE(SUM(${orderItems.quantity}), 0)`,
+          })
+          .from(orderItems)
+          .innerJoin(orders, eq(orderItems.orderId, orders.id))
+          .where(
+            and(
+              eq(orderItems.productId, existingProduct.id),
+              eq(orders.status, "waiting_payment")
+            )
+          );
+        activeReserved = Number(reservedResult?.totalReserved || 0);
+      }
+
+      const effectiveStock = Math.max(0, item.stock - activeReserved);
+
       const payload = {
         categoryId,
         providerServiceId,
@@ -115,8 +136,8 @@ export class SyncService {
         marginValue: marginValue,
         price: finalPrice,
         originalPrice: item.original_price || Math.round(finalPrice * 1.5),
-        stockStatus: item.stock > 0 ? "available" : "empty",
-        stockCount: item.stock,
+        stockStatus: effectiveStock > 0 ? "available" : "empty",
+        stockCount: effectiveStock,
         imageUrl: item.image,
         isActive: existingProduct ? existingProduct.isActive : true,
         lastSyncedAt: new Date(),

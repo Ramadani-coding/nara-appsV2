@@ -1,16 +1,19 @@
 import { syncService } from "../services/sync.service.js";
+import { orderService } from "../services/order.service.js";
 
 /**
- * Background Auto-Sync Worker
- * Menjaga seluruh katalog produk dan stok selalu tersinkronisasi otomatis dari API Premiumku
- * tanpa perlu admin menekan tombol sinkronisasi manual setiap saat.
+ * Background Auto-Sync & Reservation Sweeper Worker
+ * 1. Menjaga seluruh katalog produk dan stok selalu tersinkronisasi otomatis dari API Premiumku.
+ * 2. Memeriksa dan membatalkan pesanan expired/stale secara berkala agar stok yang di-reserve
+ *    segera kembali ke etalase toko jika pembeli tidak membayar QRIS.
  */
 
 let isSyncing = false;
 let syncIntervalId: NodeJS.Timeout | null = null;
+let sweeperIntervalId: NodeJS.Timeout | null = null;
 
-// Interval default 5 menit (300.000 ms)
-const DEFAULT_INTERVAL_MS = 5 * 60 * 1000;
+// Interval default sweeper pesanan kadaluarsa: 2 menit
+const SWEEPER_INTERVAL_MS = 2 * 60 * 1000;
 
 export async function runCatalogSync(): Promise<void> {
   if (isSyncing) {
@@ -22,6 +25,11 @@ export async function runCatalogSync(): Promise<void> {
   const startTime = Date.now();
 
   try {
+    // Jalankan pembersihan pesanan kadaluarsa sebelum sinkronisasi agar stok akurat
+    await orderService.expireStaleWaitingOrders().catch((err) => {
+      console.warn("⚠️ [AutoSyncWorker] Gagal membersihkan pesanan stale:", err.message);
+    });
+
     console.log(`[AutoSyncWorker] 🔄 [${new Date().toLocaleTimeString("id-ID")}] Memulai sinkronisasi stok otomatis dari Premiumku...`);
     const result = await syncService.syncProductsFromProvider();
     const durationMs = Date.now() - startTime;
@@ -46,16 +54,28 @@ export function startAutoSyncWorker(): void {
     runCatalogSync().catch(() => {});
   }, 8000);
 
-  // Jadwalkan periodic interval
+  // Jadwalkan periodic catalog sync
   syncIntervalId = setInterval(() => {
     runCatalogSync().catch(() => {});
   }, intervalMs);
+
+  // Jadwalkan periodic stale order sweeper (setiap 2 menit)
+  sweeperIntervalId = setInterval(() => {
+    orderService.expireStaleWaitingOrders().catch((err) => {
+      console.warn("⚠️ [Sweeper] Gagal expire pesanan stale:", err.message);
+    });
+  }, SWEEPER_INTERVAL_MS);
 }
 
 export function stopAutoSyncWorker(): void {
   if (syncIntervalId) {
     clearInterval(syncIntervalId);
     syncIntervalId = null;
-    console.log("🛑 [AutoSyncWorker] Worker dihentikan.");
   }
+  if (sweeperIntervalId) {
+    clearInterval(sweeperIntervalId);
+    sweeperIntervalId = null;
+  }
+  console.log("🛑 [AutoSyncWorker] Worker dihentikan.");
 }
+
