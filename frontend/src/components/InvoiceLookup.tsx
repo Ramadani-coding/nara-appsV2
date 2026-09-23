@@ -53,6 +53,7 @@ export function InvoiceLookup() {
             type="text"
             required
             placeholder="ORD-033*******"
+            aria-label="Nomor Pesanan atau Invoice (contoh: ORD-033...)"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="w-full bg-[#FAF8F5] border-2 border-black py-2.5 px-3.5 text-sm font-bold text-black focus:outline-none focus:ring-2 focus:ring-brand-blue shadow-[2px_2px_0px_#000] placeholder:text-gray-400"
@@ -61,7 +62,8 @@ export function InvoiceLookup() {
             <button
               type="button"
               onClick={() => setQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black cursor-pointer"
+              aria-label="Hapus nomor pesanan"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black cursor-pointer p-1"
             >
               <X className="w-4 h-4" />
             </button>

@@ -195,13 +195,17 @@ export const AdminLayout: React.FC = () => {
         <div className="flex items-center gap-2">
           <button
             onClick={toggleTheme}
-            className="w-8 h-8 bg-white dark:bg-[#1E2333] border-2 border-black dark:border-gray-700 flex items-center justify-center shadow-[2px_2px_0px_#000]"
+            aria-label={isDark ? "Beralih ke mode terang" : "Beralih ke mode gelap"}
+            className="w-10 h-10 bg-white dark:bg-[#1E2333] border-2 border-black dark:border-gray-700 flex items-center justify-center shadow-[2px_2px_0px_#000] rounded-lg active:translate-x-0.5 active:translate-y-0.5"
           >
             {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-black" />}
           </button>
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
-            className="w-8 h-8 bg-white dark:bg-[#1E2333] border-2 border-black dark:border-gray-700 flex items-center justify-center shadow-[2px_2px_0px_#000]"
+            aria-label={mobileOpen ? "Tutup menu admin" : "Buka menu admin"}
+            aria-expanded={mobileOpen}
+            aria-controls="mobile-admin-drawer"
+            className="w-10 h-10 bg-white dark:bg-[#1E2333] border-2 border-black dark:border-gray-700 flex items-center justify-center shadow-[2px_2px_0px_#000] rounded-lg active:translate-x-0.5 active:translate-y-0.5"
           >
             {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
@@ -210,13 +214,14 @@ export const AdminLayout: React.FC = () => {
 
       {/* Mobile Drawer */}
       {mobileOpen && (
-        <div className="md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-xs flex flex-col justify-end">
+        <div id="mobile-admin-drawer" className="md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-xs flex flex-col justify-end">
           <div className="bg-white dark:bg-[#151821] border-t-2 border-black dark:border-gray-700 p-5 space-y-4 max-h-[85vh] overflow-y-auto">
             <div className="flex justify-between items-center pb-2 border-b border-gray-300 dark:border-gray-700">
               <span className="font-black text-xs uppercase tracking-wider text-gray-500">Menu Admin</span>
               <button 
                 onClick={() => setMobileOpen(false)}
-                className="p-1 border border-black dark:border-gray-700 bg-gray-100 dark:bg-gray-800"
+                aria-label="Tutup menu admin"
+                className="w-9 h-9 border border-black dark:border-gray-700 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center active:translate-x-0.5 active:translate-y-0.5"
               >
                 <X className="w-4 h-4" />
               </button>

@@ -94,20 +94,23 @@ export function Navbar() {
             <button
               onClick={toggleTheme}
               title={isDark ? "Beralih ke Mode Terang (Light Mode)" : "Beralih ke Mode Gelap (Dark Mode)"}
-              aria-label="Toggle Theme"
-              className="w-9 h-9 sm:w-10 sm:h-10 bg-white border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000] hover:bg-brand-yellow cursor-pointer active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all"
+              aria-label={isDark ? "Beralih ke mode terang" : "Beralih ke mode gelap"}
+              className="w-11 h-11 bg-white border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000] hover:bg-brand-yellow cursor-pointer active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all rounded-lg"
             >
               {isDark ? (
-                <Sun className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
+                <Sun className="w-5 h-5 text-amber-400" />
               ) : (
-                <Moon className="w-4 h-4 sm:w-5 sm:h-5 text-black" />
+                <Moon className="w-5 h-5 text-black" />
               )}
             </button>
 
             {/* Mobile Menu Trigger */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden w-9 h-9 bg-white border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000] cursor-pointer"
+              aria-label={mobileMenuOpen ? "Tutup menu navigasi" : "Buka menu navigasi"}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="mobile-nav-menu"
+              className="md:hidden w-11 h-11 bg-white border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000] cursor-pointer rounded-lg active:translate-x-0.5 active:translate-y-0.5"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
@@ -117,7 +120,7 @@ export function Navbar() {
 
       {/* Mobile Dropdown Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t-2 border-black bg-white p-4 space-y-3 font-bold text-sm">
+        <div id="mobile-nav-menu" className="md:hidden border-t-2 border-black bg-white p-4 space-y-3 font-bold text-sm">
           <Link
             to="/"
             onClick={() => setMobileMenuOpen(false)}

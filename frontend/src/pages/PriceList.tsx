@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useDeferredValue } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Search, ShoppingCart, Tag, ArrowLeft, ChevronLeft, ChevronRight, X } from 'lucide-react';
@@ -22,6 +22,7 @@ const ITEMS_PER_PAGE = 10;
 
 export default function PriceList() {
   const [searchQuery, setSearchQuery] = useState('');
+  const deferredQuery = useDeferredValue(searchQuery);
   const [currentPage, setCurrentPage] = useState(1);
   const navigate = useNavigate();
   const liveServices = useLiveServices();
@@ -49,13 +50,13 @@ export default function PriceList() {
   }, [liveServices]);
 
   const filteredItems = useMemo(() => {
-    const q = searchQuery.toLowerCase().trim();
+    const q = deferredQuery.toLowerCase().trim();
     if (!q) return allItems;
     return allItems.filter(item => 
       item.name.toLowerCase().includes(q) ||
       item.serviceName.toLowerCase().includes(q)
     );
-  }, [allItems, searchQuery]);
+  }, [allItems, deferredQuery]);
 
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / ITEMS_PER_PAGE));
 
@@ -76,6 +77,21 @@ export default function PriceList() {
       window.scrollTo({ top: 120, behavior: 'smooth' });
     }
   };
+
+  const paginationPages = useMemo(() => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    const pages: (number | string)[] = [];
+    if (currentPage <= 4) {
+      pages.push(1, 2, 3, 4, 5, '...', totalPages);
+    } else if (currentPage >= totalPages - 3) {
+      pages.push(1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+    } else {
+      pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
+    }
+    return pages;
+  }, [totalPages, currentPage]);
 
   return (
     <motion.div 
@@ -127,6 +143,7 @@ export default function PriceList() {
           <input 
             type="text"
             placeholder="Cari layanan (Contoh: Netflix, Canva, CapCut)..."
+            aria-label="Cari layanan atau paket produk"
             value={searchQuery}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full py-2 px-2 text-xs sm:text-sm font-bold text-black dark:text-white placeholder:text-gray-400 focus:outline-none bg-transparent"
@@ -134,6 +151,7 @@ export default function PriceList() {
           {searchQuery && (
             <button 
               onClick={() => handleSearchChange('')}
+              aria-label="Hapus kata kunci pencarian"
               className="p-1 mr-2 text-gray-400 hover:text-black dark:hover:text-white shrink-0 cursor-pointer"
               title="Hapus pencarian"
             >
@@ -230,7 +248,8 @@ export default function PriceList() {
                     {/* Action Buy Button */}
                     <button
                       onClick={() => navigate(`/checkout/${item.serviceId}?package=${item.id}`)}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-brand-blue hover:bg-blue-600 text-white font-black text-xs uppercase tracking-wider border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] neo-btn rounded-xl shrink-0 cursor-pointer"
+                      aria-label={`Beli paket ${item.name}`}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-brand-blue hover:bg-blue-600 text-white font-black text-xs uppercase tracking-wider border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] neo-btn rounded-xl shrink-0 cursor-pointer active:translate-x-0.5 active:translate-y-0.5"
                     >
                       <ShoppingCart className="w-3.5 h-3.5" />
                       <span>BELI</span>
@@ -336,7 +355,8 @@ export default function PriceList() {
                         <button
                           onClick={() => navigate(`/checkout/${item.serviceId}?package=${item.id}`)}
                           title={`Beli ${item.name}`}
-                          className="w-8 h-8 bg-purple-50 dark:bg-purple-950/60 hover:bg-brand-blue text-purple-700 dark:text-purple-300 hover:text-white border border-purple-200 dark:border-purple-800 hover:border-black rounded-lg inline-flex items-center justify-center transition-all neo-btn cursor-pointer"
+                          aria-label={`Beli paket ${item.name}`}
+                          className="w-10 h-10 bg-purple-50 dark:bg-purple-950/60 hover:bg-brand-blue text-purple-700 dark:text-purple-300 hover:text-white border border-purple-200 dark:border-purple-800 hover:border-black rounded-xl inline-flex items-center justify-center transition-all neo-btn cursor-pointer active:translate-x-0.5 active:translate-y-0.5"
                         >
                           <ShoppingCart className="w-4 h-4" />
                         </button>
@@ -361,43 +381,58 @@ export default function PriceList() {
               <button
                 onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage === 1}
-                className={`px-2.5 py-1.5 text-xs font-black border-2 border-black dark:border-gray-700 flex items-center gap-1 shadow-[1.5px_1.5px_0px_#000] rounded-md transition-all ${
+                aria-label="Halaman sebelumnya"
+                className={`min-h-[40px] px-3 text-xs font-black border-2 border-black dark:border-gray-700 flex items-center gap-1 shadow-[1.5px_1.5px_0px_#000] rounded-xl transition-all ${
                   currentPage === 1
                     ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 border-gray-300 dark:border-gray-700 shadow-none cursor-not-allowed'
-                    : 'bg-white dark:bg-[#181C2A] hover:bg-gray-100 text-black dark:text-white cursor-pointer neo-btn'
+                    : 'bg-white dark:bg-[#181C2A] hover:bg-gray-100 text-black dark:text-white cursor-pointer neo-btn active:translate-x-0.5 active:translate-y-0.5'
                 }`}
               >
-                <ChevronLeft className="w-3.5 h-3.5" />
+                <ChevronLeft className="w-4 h-4" />
                 <span className="hidden sm:inline">Sebelumnya</span>
               </button>
 
-              {/* Page Number Buttons */}
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-                <button
-                  key={pageNum}
-                  onClick={() => handlePageChange(pageNum)}
-                  className={`w-8 h-8 text-xs font-black border-2 border-black dark:border-gray-700 flex items-center justify-center shadow-[1.5px_1.5px_0px_#000] rounded-md transition-all cursor-pointer ${
-                    currentPage === pageNum
-                      ? 'bg-brand-blue text-white shadow-[2px_2px_0px_#000]'
-                      : 'bg-white dark:bg-[#181C2A] hover:bg-gray-100 text-black dark:text-white neo-btn'
-                  }`}
-                >
-                  {pageNum}
-                </button>
-              ))}
+              {/* Page Number Buttons with Smart Ellipsis */}
+              {paginationPages.map((page, idx) => {
+                if (page === '...') {
+                  return (
+                    <span key={`ellipsis-${idx}`} className="w-8 h-8 flex items-center justify-center font-black text-gray-400 select-none">
+                      ...
+                    </span>
+                  );
+                }
+                const pageNum = Number(page);
+                const isActive = currentPage === pageNum;
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => handlePageChange(pageNum)}
+                    aria-label={`Halaman ${pageNum}`}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={`min-w-[40px] min-h-[40px] sm:w-10 sm:h-10 text-xs font-black border-2 border-black dark:border-gray-700 flex items-center justify-center shadow-[1.5px_1.5px_0px_#000] rounded-xl transition-all cursor-pointer active:translate-x-0.5 active:translate-y-0.5 ${
+                      isActive
+                        ? 'bg-brand-blue text-white shadow-[2px_2px_0px_#000]'
+                        : 'bg-white dark:bg-[#181C2A] hover:bg-gray-100 text-black dark:text-white neo-btn'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
 
               {/* Next Button */}
               <button
                 onClick={() => handlePageChange(currentPage + 1)}
                 disabled={currentPage === totalPages}
-                className={`px-2.5 py-1.5 text-xs font-black border-2 border-black dark:border-gray-700 flex items-center gap-1 shadow-[1.5px_1.5px_0px_#000] rounded-md transition-all ${
+                aria-label="Halaman berikutnya"
+                className={`min-h-[40px] px-3 text-xs font-black border-2 border-black dark:border-gray-700 flex items-center gap-1 shadow-[1.5px_1.5px_0px_#000] rounded-xl transition-all ${
                   currentPage === totalPages
                     ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 border-gray-300 dark:border-gray-700 shadow-none cursor-not-allowed'
-                    : 'bg-white dark:bg-[#181C2A] hover:bg-gray-100 text-black dark:text-white cursor-pointer neo-btn'
+                    : 'bg-white dark:bg-[#181C2A] hover:bg-gray-100 text-black dark:text-white cursor-pointer neo-btn active:translate-x-0.5 active:translate-y-0.5'
                 }`}
               >
                 <span className="hidden sm:inline">Berikutnya</span>
-                <ChevronRight className="w-3.5 h-3.5" />
+                <ChevronRight className="w-4 h-4" />
               </button>
             </div>
           </div>

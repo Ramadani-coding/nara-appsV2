@@ -426,22 +426,22 @@ export default function Checkout() {
             ) : null}
           </div>
 
-          <div className="flex items-center gap-1.5 self-end sm:self-auto">
+          <div className="flex items-center gap-2 self-end sm:self-auto">
             <button 
               type="button" 
               onClick={() => setQuantity(prev => (prev > 1 ? prev - 1 : 1))}
               disabled={isOutOfStock || isSelectedPkgMaintenance || quantity <= 1}
-              aria-label="Kurangi Jumlah"
-              className={`w-8 h-8 rounded-lg border-2 border-black dark:border-gray-700 font-black text-sm flex items-center justify-center transition-all ${
+              aria-label="Kurangi jumlah pesanan"
+              className={`min-w-[44px] min-h-[44px] w-11 h-11 rounded-xl border-2 border-black dark:border-gray-700 font-black text-sm flex items-center justify-center transition-all ${
                 quantity <= 1 || isOutOfStock || isSelectedPkgMaintenance
                   ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 border-gray-300 dark:border-gray-800 shadow-none cursor-not-allowed' 
-                  : 'bg-white dark:bg-[#1E2333] text-black dark:text-white hover:bg-gray-100 shadow-[2px_2px_0px_#000] cursor-pointer neo-btn'
+                  : 'bg-white dark:bg-[#1E2333] text-black dark:text-white hover:bg-gray-100 shadow-[2px_2px_0px_#000] cursor-pointer neo-btn active:translate-x-0.5 active:translate-y-0.5'
               }`}
             >
-              <Minus className="w-3.5 h-3.5" />
+              <Minus className="w-4 h-4" />
             </button>
 
-            <div className="w-10 h-8 bg-white dark:bg-[#1E2333] border-2 border-black dark:border-gray-700 font-black text-sm flex items-center justify-center shadow-[2px_2px_0px_#000] rounded-lg">
+            <div className="min-w-[44px] h-11 px-3 bg-white dark:bg-[#1E2333] border-2 border-black dark:border-gray-700 font-black text-base flex items-center justify-center shadow-[2px_2px_0px_#000] rounded-xl font-mono">
               {quantity}
             </div>
 
@@ -449,15 +449,15 @@ export default function Checkout() {
               type="button" 
               onClick={() => setQuantity(prev => (prev < maxAllowedQty ? prev + 1 : prev))}
               disabled={isOutOfStock || isSelectedPkgMaintenance || quantity >= maxAllowedQty}
-              aria-label="Tambah Jumlah"
-              title={quantity >= maxAllowedQty ? `Maksimal pembelian adalah ${maxAllowedQty} unit` : 'Tambah jumlah'}
-              className={`w-8 h-8 rounded-lg border-2 font-black text-sm flex items-center justify-center transition-all ${
+              aria-label="Tambah jumlah pesanan"
+              title={quantity >= maxAllowedQty ? `Maksimal pembelian adalah ${maxAllowedQty} unit` : 'Tambah jumlah pesanan'}
+              className={`min-w-[44px] min-h-[44px] w-11 h-11 rounded-xl border-2 font-black text-sm flex items-center justify-center transition-all ${
                 isOutOfStock || isSelectedPkgMaintenance || quantity >= maxAllowedQty
                   ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 border-gray-400 shadow-none cursor-not-allowed'
-                  : 'bg-brand-blue text-white hover:bg-blue-700 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] cursor-pointer neo-btn'
+                  : 'bg-brand-blue text-white hover:bg-blue-700 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] cursor-pointer neo-btn active:translate-x-0.5 active:translate-y-0.5'
               }`}
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="w-4 h-4" />
             </button>
           </div>
         </div>

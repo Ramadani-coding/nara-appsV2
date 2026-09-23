@@ -22,6 +22,7 @@ import AdminOrders from "./pages/admin/AdminOrders";
 import AdminProducts from "./pages/admin/AdminProducts";
 import AdminAnalytics from "./pages/admin/AdminAnalytics";
 import AdminProfile from "./pages/admin/AdminProfile";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 /**
  * Public Layout with Store Navbar & Footer
@@ -40,9 +41,10 @@ function PublicLayout() {
 
 function App() {
   return (
-    <AdminAuthProvider>
-      <Router>
-        <ScrollToTop />
+    <ErrorBoundary>
+      <AdminAuthProvider>
+        <Router>
+          <ScrollToTop />
         <Routes>
           {/* Admin Login Route (Standalone) */}
           <Route path="/admin/login" element={<AdminLogin />} />
@@ -81,6 +83,7 @@ function App() {
         </Routes>
       </Router>
     </AdminAuthProvider>
+  </ErrorBoundary>
   );
 }
 

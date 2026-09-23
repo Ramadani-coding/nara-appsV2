@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useDeferredValue } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
@@ -16,16 +16,14 @@ import { LiveSalesToast } from '../components/LiveSalesToast';
 import { InvoiceLookup } from '../components/InvoiceLookup';
 import { CaraOrderSection } from '../components/CaraOrderSection';
 import { FAQSection } from '../components/FAQSection';
+import { HeroOrderSimulator } from '../components/HeroOrderSimulator';
 
 export default function Home() {
   const [activeCategory, setActiveCategory] = useState<string | undefined>();
   const [searchQuery, setSearchQuery] = useState('');
+  const deferredSearch = useDeferredValue(searchQuery);
 
-  const services = useLiveServices(activeCategory, searchQuery);
-  const alightMotion = services.find(s => s.id === 'alight-motion');
-  const heroLowestPrice = alightMotion?.packages[0]?.price 
-    ? alightMotion.packages[0].price.toLocaleString('id-ID') 
-    : '5.400';
+  const services = useLiveServices(activeCategory, deferredSearch);
 
   const scrollToSection = (id: string) => {
     const el = document.getElementById(id);
@@ -35,136 +33,119 @@ export default function Home() {
   };
 
   return (
-    <div className="space-y-16 pb-16 text-black">
+    <div className="space-y-16 pb-16 text-black dark:text-gray-100">
       {/* ========================================================
-          HERO SECTION
+          HERO SECTION (Upgraded with Interactive Order Simulator)
          ======================================================== */}
-      <section className="pt-4 pb-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+      <section className="pt-2 sm:pt-4 pb-6 sm:pb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
           
           {/* Left Hero Content */}
-          <div className="lg:col-span-7 space-y-6">
+          <div className="lg:col-span-7 space-y-5 sm:space-y-6">
             
             {/* Trust & Guarantee Tag */}
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-brand-yellow border-2 border-black shadow-[2px_2px_0px_#000] font-black text-xs uppercase tracking-wider">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-brand-yellow border-2 border-black shadow-[2px_2px_0px_#000] font-black text-xs uppercase tracking-wider rounded-lg">
               <ShieldCheck className="w-4 h-4 text-black" />
               <span>PROSES OTOMATIS 24/7</span>
             </div>
 
-            {/* Headline */}
-            <div className="space-y-1">
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-black leading-tight">
+            {/* Headline: Responsive scale so mobile doesn't blow up viewport height */}
+            <div className="space-y-0.5 sm:space-y-1">
+              <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-black dark:text-white leading-tight">
                 Langganan Premium
               </h1>
-              <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-brand-blue leading-tight">
+              <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-brand-blue dark:text-blue-400 leading-tight">
                 Aplikasi Digital Favorit
               </h2>
             </div>
 
             {/* Sub-headline */}
-            <p className="text-base sm:text-lg text-gray-800 font-medium max-w-xl leading-relaxed">
+            <p className="text-xs sm:text-base lg:text-lg text-gray-700 dark:text-gray-300 font-medium max-w-xl leading-relaxed">
               Akses premium resmi untuk kebutuhan streaming, produktivitas, dan editing dengan harga terjangkau. 
               Pembayaran instan via QRIS dan garansi penggantian selama masa aktif.
             </p>
 
-            {/* CTA Action Buttons */}
-            <div className="flex flex-wrap items-center gap-4 pt-2">
+            {/* CTA Action Buttons: Side-by-side on mobile, flex on desktop */}
+            <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-4 pt-1 sm:pt-2">
               <button
                 onClick={() => scrollToSection('products-catalog')}
-                className="px-6 py-3.5 bg-brand-blue hover:bg-blue-700 text-white font-black text-sm uppercase tracking-wider border-2 border-black shadow-[4px_4px_0px_#000] neo-btn flex items-center gap-2 cursor-pointer"
+                className="min-h-[44px] px-3 sm:px-6 py-2.5 sm:py-3 bg-brand-blue hover:bg-blue-700 text-white font-black text-xs sm:text-sm uppercase tracking-wider border-2 border-black rounded-xl shadow-[3px_3px_0px_#000] neo-btn flex items-center justify-center gap-1.5 cursor-pointer transition-all active:translate-x-0.5 active:translate-y-0.5"
               >
-                <span>BELANJA SEKARANG</span>
-                <ArrowRight className="w-4 h-4" />
+                <span>BELANJA</span>
+                <span className="hidden sm:inline">SEKARANG</span>
+                <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
               </button>
 
               <button
                 onClick={() => scrollToSection('cara-order')}
-                className="px-6 py-3.5 bg-white hover:bg-gray-50 text-black font-black text-sm uppercase tracking-wider border-2 border-black shadow-[4px_4px_0px_#000] neo-btn cursor-pointer"
+                className="min-h-[44px] px-3 sm:px-6 py-2.5 sm:py-3 bg-white dark:bg-[#1E2333] hover:bg-gray-50 text-black dark:text-white font-black text-xs sm:text-sm uppercase tracking-wider border-2 border-black dark:border-gray-700 rounded-xl shadow-[3px_3px_0px_#000] neo-btn cursor-pointer transition-all active:translate-x-0.5 active:translate-y-0.5 text-center flex items-center justify-center"
               >
-                LIHAT CARA ORDER
+                CARA ORDER
               </button>
             </div>
 
-            {/* Verifiable Stats & Value Props */}
-            <div className="grid grid-cols-3 gap-3 sm:gap-4 pt-6 max-w-lg">
-              <div className="p-3 sm:p-4 bg-white border-2 border-black shadow-[3px_3px_0px_#000]">
-                <div className="text-2xl sm:text-3xl font-black text-black">
+            {/* Desktop Stats (hidden on mobile to prevent fold clipping) */}
+            <div className="hidden sm:grid grid-cols-3 gap-3 sm:gap-4 pt-3 sm:pt-4 max-w-lg">
+              <div className="p-3 sm:p-4 bg-white dark:bg-[#1E2333] border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] rounded-xl">
+                <div className="text-2xl sm:text-3xl font-black text-black dark:text-white">
                   {services.length > 0 ? `${services.length}+` : '20+'}
                 </div>
-                <div className="text-[10px] sm:text-xs font-extrabold uppercase text-gray-600 tracking-wider">
+                <div className="text-[10px] sm:text-xs font-extrabold uppercase text-gray-500 dark:text-gray-400 tracking-wider">
                   PILIHAN PRODUK
                 </div>
               </div>
 
-              <div className="p-3 sm:p-4 bg-white border-2 border-black shadow-[3px_3px_0px_#000]">
-                <div className="text-2xl sm:text-3xl font-black text-brand-blue">100%</div>
-                <div className="text-[10px] sm:text-xs font-extrabold uppercase text-gray-600 tracking-wider">
+              <div className="p-3 sm:p-4 bg-white dark:bg-[#1E2333] border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] rounded-xl">
+                <div className="text-2xl sm:text-3xl font-black text-brand-blue dark:text-blue-400">100%</div>
+                <div className="text-[10px] sm:text-xs font-extrabold uppercase text-gray-500 dark:text-gray-400 tracking-wider">
                   GARANSI RESMI
                 </div>
               </div>
 
-              <div className="p-3 sm:p-4 bg-white border-2 border-black shadow-[3px_3px_0px_#000]">
-                <div className="text-2xl sm:text-3xl font-black text-emerald-600">24/7</div>
-                <div className="text-[10px] sm:text-xs font-extrabold uppercase text-gray-600 tracking-wider">
+              <div className="p-3 sm:p-4 bg-white dark:bg-[#1E2333] border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] rounded-xl">
+                <div className="text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400">24/7</div>
+                <div className="text-[10px] sm:text-xs font-extrabold uppercase text-gray-500 dark:text-gray-400 tracking-wider">
                   SISTEM OTOMATIS
+                </div>
+              </div>
+            </div>
+
+            {/* Mobile Trust Strip (Compact horizontal strip for mobile screens < 640px) */}
+            <div className="flex sm:hidden items-center justify-between gap-1.5 p-2.5 bg-white dark:bg-[#1E2333] border-2 border-black dark:border-gray-700 shadow-[2.5px_2.5px_0px_#000] rounded-xl text-center">
+              <div className="flex-1">
+                <div className="text-base font-black text-black dark:text-white leading-tight">
+                  {services.length > 0 ? `${services.length}+` : '20+'}
+                </div>
+                <div className="text-[9px] font-extrabold uppercase text-gray-500 dark:text-gray-400">
+                  Produk
+                </div>
+              </div>
+              <div className="w-[1px] h-6 bg-gray-300 dark:bg-gray-700" />
+              <div className="flex-1">
+                <div className="text-base font-black text-brand-blue dark:text-blue-400 leading-tight">100%</div>
+                <div className="text-[9px] font-extrabold uppercase text-gray-500 dark:text-gray-400">
+                  Garansi
+                </div>
+              </div>
+              <div className="w-[1px] h-6 bg-gray-300 dark:bg-gray-700" />
+              <div className="flex-1">
+                <div className="text-base font-black text-emerald-600 dark:text-emerald-400 leading-tight">24/7</div>
+                <div className="text-[9px] font-extrabold uppercase text-gray-500 dark:text-gray-400">
+                  Otomatis
                 </div>
               </div>
             </div>
 
           </div>
 
-          {/* Right Hero Graphic: Layered Neo-Brutalist Art (Hidden on mobile) */}
-          <div className="hidden lg:flex lg:col-span-5 justify-end relative py-6">
-            <div className="relative w-full max-w-sm sm:max-w-md">
-              
-              {/* Tilted background yellow decorative rectangle */}
-              <div className="absolute -top-4 -right-3 w-32 h-36 bg-brand-yellow border-2 border-black rotate-12 -z-10 shadow-[2px_2px_0px_#000]" />
-              
-              {/* Tilted bottom-left pink decorative rectangle */}
-              <div className="absolute -bottom-4 -left-3 w-28 h-28 bg-brand-pink border-2 border-black -rotate-12 -z-10 shadow-[2px_2px_0px_#000]" />
+          {/* Right Hero: Animated Desktop Order Simulator (Screen >= 1024px) */}
+          <div className="hidden lg:block lg:col-span-5 relative py-2">
+            <HeroOrderSimulator services={services} />
+          </div>
 
-              {/* Main Neo-Brutalist Card with Crisp Brand Blue */}
-              <div className="bg-brand-blue p-6 sm:p-8 border-2 border-black shadow-[6px_6px_0px_0px_#000000] text-white relative overflow-hidden">
-                
-                {/* Top Badge Row */}
-                <div className="flex justify-between items-start mb-12">
-                  <span className="px-2.5 py-1 bg-white text-black font-extrabold text-xs uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000]">
-                    PREMIUM ACCESS
-                  </span>
-                  <img 
-                    src="/nara-logov2.png" 
-                    alt="Nara Premium Logo" 
-                    className="w-10 h-10 rounded-xl bg-white p-0.5 border-2 border-black shadow-[2px_2px_0px_#000] object-contain shrink-0" 
-                  />
-                </div>
-
-                {/* Big Headline */}
-                <div className="space-y-1 mb-14">
-                  <h3 className="text-3xl sm:text-4xl font-black tracking-tight text-white leading-none drop-shadow-[2px_2px_0px_#000]">
-                    YOUR
-                  </h3>
-                  <h3 className="text-3xl sm:text-4xl font-black tracking-tight text-white leading-none drop-shadow-[2px_2px_0px_#000]">
-                    DIGITAL
-                  </h3>
-                  <h3 className="text-3xl sm:text-4xl font-black tracking-tight text-white leading-none drop-shadow-[2px_2px_0px_#000]">
-                    STORE.
-                  </h3>
-                </div>
-
-                {/* Bottom Tag */}
-                <div className="flex justify-between items-end">
-                  <div className="inline-block px-3 py-1.5 bg-brand-yellow text-black font-black text-sm uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000]">
-                    START Rp{heroLowestPrice}
-                  </div>
-                  
-                  {/* Floating decorative square */}
-                  <div className="w-8 h-8 bg-brand-yellow border-2 border-black rotate-12 shadow-[2px_2px_0px_#000]" />
-                </div>
-
-                {/* Corner decorative semi-circle */}
-                <div className="absolute -top-12 -right-12 w-36 h-36 rounded-full bg-brand-pink/40 border-2 border-black pointer-events-none" />
-              </div>
-            </div>
+          {/* Mobile Order Simulator: Interactive Quick Order on Mobile (Screen < 1024px) */}
+          <div className="block lg:hidden w-full pt-2">
+            <HeroOrderSimulator services={services} isMobileCompact={true} />
           </div>
 
         </div>
@@ -233,6 +214,7 @@ export default function Home() {
           <input
             type="text"
             placeholder="Cari produk (cth: netflix)..."
+            aria-label="Cari produk aplikasi (contoh: Netflix, Canva, Spotify)"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full py-2 px-2 text-sm font-bold placeholder:text-gray-400 focus:outline-none text-black"
@@ -240,8 +222,15 @@ export default function Home() {
         </div>
 
         {/* Category Pills (Tabs with Neo-Brutalist borders from Image 1) */}
-        <div id="categories-filter" className="scroll-mt-24 flex items-center gap-2 overflow-x-auto pb-2 hide-scrollbar">
+        <div 
+          id="categories-filter" 
+          role="tablist" 
+          aria-label="Filter kategori produk"
+          className="scroll-mt-24 flex items-center gap-2 overflow-x-auto pb-2 hide-scrollbar"
+        >
           <button
+            role="tab"
+            aria-selected={!activeCategory}
             onClick={() => setActiveCategory(undefined)}
             className={`px-4 py-2 text-xs font-black uppercase tracking-wider border-2 border-black transition-all cursor-pointer whitespace-nowrap ${
               !activeCategory
@@ -257,6 +246,8 @@ export default function Home() {
             return (
               <button
                 key={cat.id}
+                role="tab"
+                aria-selected={isActive}
                 onClick={() => setActiveCategory(cat.slug)}
                 className={`px-4 py-2 text-xs font-black uppercase tracking-wider border-2 border-black transition-all cursor-pointer whitespace-nowrap ${
                   isActive

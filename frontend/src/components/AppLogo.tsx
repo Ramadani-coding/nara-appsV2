@@ -11,6 +11,8 @@ export function AppLogo({ id, className = "w-16 h-16", imageUrl }: AppLogoProps)
         <img 
           src={imageUrl} 
           alt={id} 
+          loading="lazy"
+          decoding="async"
           className="w-full h-full object-contain" 
           onError={(e) => {
             (e.target as HTMLElement).style.display = 'none';

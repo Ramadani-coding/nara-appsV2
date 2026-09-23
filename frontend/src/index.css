@@ -183,7 +183,7 @@
   color: #F9A8D4 !important;
 }
 
-/* Typography & Contrast */
+/* Typography & Contrast (WCAG AA Compliant >= 4.5:1 in Dark Mode) */
 .dark .text-black {
   color: #F9FAFB !important;
 }
@@ -191,19 +191,19 @@
 .dark .text-gray-900,
 .dark .text-gray-800,
 .dark .text-gray-700 {
-  color: #E5E7EB !important;
+  color: #F3F4F6 !important;
 }
 
 .dark .text-gray-600 {
-  color: #9CA3AF !important;
+  color: #D1D5DB !important;
 }
 
 .dark .text-gray-500 {
-  color: #94A3B8 !important;
+  color: #9CA3AF !important;
 }
 
 .dark .text-gray-400 {
-  color: #64748B !important;
+  color: #94A3B8 !important;
 }
 
 .dark .text-amber-800 {
@@ -253,7 +253,7 @@
 }
 
 .dark input::placeholder {
-  color: #64748B !important;
+  color: #94A3B8 !important;
 }
 
 /* Shadows in Dark Mode */
@@ -265,5 +265,27 @@
 .dark .shadow-\[6px_6px_0px_0px_\#000000\],
 .dark .shadow-\[6px_6px_0px_\#000\] {
   box-shadow: 3px 3px 0px 0px #06080B !important;
+}
+
+/* Brand Selection Highlight */
+::selection {
+  background-color: #2563EB;
+  color: #FFFFFF;
+}
+
+.dark ::selection {
+  background-color: #FACC15;
+  color: #000000;
+}
+
+/* Motion Sensitivity: Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto !important;
+  }
+  .neo-btn:hover,
+  .neo-btn:active {
+    transform: none !important;
+  }
 }
 
