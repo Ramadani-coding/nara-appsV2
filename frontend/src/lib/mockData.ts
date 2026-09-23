@@ -432,7 +432,7 @@ export let SERVICES: ServiceProduct[] = [
     name: "Wink Retouch & AI",
     category: "Musik & Video",
     categorySlug: "musik-video",
-    tagline: "Mulai Rp4.000",
+    tagline: "Mulai Rp 9.200",
     badge: "AUTO",
     badgeColor: "emerald",
     iconId: "wink",
@@ -442,34 +442,18 @@ export let SERVICES: ServiceProduct[] = [
     description: "Aplikasi retouch video dan foto berbasis AI: perbaiki kualitas video blur ke Ultra HD 4K, edit wajah otomatis, dan filter estetik.",
     packages: [
       {
-        id: "wink-android",
-        providerId: 133,
-        serviceId: "wink",
-        serviceName: "Wink Retouch & AI",
-        name: "Wink 3-7 Hari Android Only",
-        type: "Privat",
-        duration: "3-7 Hari",
-        stockCount: 1,
-        stockBadge: "ADA 1",
-        discountPercent: 99,
-        originalPrice: 423298,
-        price: 4000,
-        description: "Masa aktif random 3-7 hari, khusus perangkat Android.",
-        imageUrl: "https://cdn.premku.com/img/wink.png"
-      },
-      {
         id: "wink-all-device",
         providerId: 161,
         serviceId: "wink",
         serviceName: "Wink Retouch & AI",
-        name: "Wink 3-7 Hari Random All Device",
+        name: "Wink 3-7 Hari All Device",
         type: "Privat",
         duration: "3-7 Hari",
-        stockCount: 6,
-        stockBadge: "ADA 6",
+        stockCount: 7,
+        stockBadge: "ADA 7",
         discountPercent: 93,
         originalPrice: 64856,
-        price: 4400,
+        price: 9200,
         description: "Aktif 3-7 hari random, bisa semua perangkat (iOS & Android). Login via opsi email.",
         imageUrl: "https://cdn.premku.com/img/wink.png"
       }
@@ -609,13 +593,13 @@ export let SERVICES: ServiceProduct[] = [
     name: "Vidio Premier",
     category: "Musik & Video",
     categorySlug: "musik-video",
-    tagline: "Rp 27.000 (Habis)",
-    badge: "AUTO",
+    tagline: "Mulai Rp 15.000",
+    badge: "HOT",
     badgeColor: "emerald",
     iconId: "vidio",
     imageUrl: "https://cdn.premku.com/img/vidio.png",
     genreTag: "STREAMING BOLA & SERIES",
-    accountTypeTag: "Mobile Plan",
+    accountTypeTag: "Mobile & Smart TV",
     description: "Nonton siaran langsung BRI Liga 1, Premier League, UEFA Champions League, Vidio Original Series, dan tayangan TV nasional.",
     packages: [
       {
@@ -632,6 +616,22 @@ export let SERVICES: ServiceProduct[] = [
         originalPrice: 75000,
         price: 27000,
         description: "VIDIO MOBILE khusus HP / Tablet. Jangan ganti nomor HP di akun agar garansi tetap berlaku.",
+        imageUrl: "https://cdn.premku.com/img/vidio.png"
+      },
+      {
+        id: "vidio-1y-tv",
+        providerId: 131,
+        serviceId: "vidio",
+        serviceName: "Vidio Premier",
+        name: "VD TV 1 Tahun",
+        type: "Sharing",
+        duration: "1 Tahun",
+        stockCount: 41,
+        stockBadge: "ADA 41",
+        discountPercent: 97,
+        originalPrice: 555888,
+        price: 15000,
+        description: "VIDIO 1 TAHUN KHUSUS UNTUK TV GARANSI SAAT LOGIN - 15 HARI KEDEPAN SETLAH LOGIN INGAT UNTUK TV BUKAN DI HP / TAB / PC CUMA BISA DI TV!",
         imageUrl: "https://cdn.premku.com/img/vidio.png"
       }
     ]

@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import apiRouter from "./routes/index.js";
+import { globalApiLimiter } from "./middleware/rateLimiter.js";
 
 export const app = express();
 
@@ -23,6 +24,9 @@ app.get("/", (_req, res) => {
     docs: "/api/health",
   });
 });
+
+// Global API Rate Limiter
+app.use("/api", globalApiLimiter);
 
 // API Routes
 app.use("/api", apiRouter);

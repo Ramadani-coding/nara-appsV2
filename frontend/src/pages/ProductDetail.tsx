@@ -127,7 +127,7 @@ export default function ProductDetail() {
 
         {/* Grid of Package Cards (2 columns on mobile, scaling up to 4 on desktop) */}
         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
-          {service.packages.map((pkg: ProductPackage, index: number) => {
+          {service.packages.filter((pkg: ProductPackage) => pkg.isActive !== false).map((pkg: ProductPackage, index: number) => {
             const isOutOfStock = pkg.stockCount <= 0;
             const pkgModalPrice = pkg.providerPrice || pkg.price;
             const isPkgMaintenance = pkg.isMaintenance !== undefined 

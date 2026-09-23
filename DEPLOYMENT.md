@@ -14,6 +14,7 @@ Panduan lengkap ini menjelaskan langkah demi langkah untuk menaikkan website **N
 7. [Konfigurasi Domain & SSL / HTTPS](#7-konfigurasi-domain--ssl--https)
 8. [Konfigurasi Webhook Midtrans Production](#8-konfigurasi-webhook-midtrans-production)
 9. [Perintah Operasional & Maintenance Harian](#9-perintah-operasional--maintenance-harian)
+10. [Panduan Keamanan Anti-DDoS & Proteksi Server](#10-panduan-keamanan-anti-ddos--proteksi-server)
 
 ---
 
@@ -333,3 +334,54 @@ git pull origin main
 docker compose up -d --build
 ```
 *Proses ini akan me-rebuild image dan mengganti container lama dengan downtime kurang dari 5 detik.*
+
+---
+
+## 10. Panduan Keamanan Anti-DDoS & Proteksi Server
+
+Aplikasi Nara Digital Store telah dilengkapi dengan sistem keamanan bertingkat (*Defense-in-Depth*) untuk mencegah server down akibat lonjakan traffic tiba-tiba, serangan DoS/DDoS, serta spamming transaksi bot.
+
+### A. Arsitektur Pertahanan 3 Lapis
+1. **Lapis 1: Cloudflare Edge (WAF & Anti-DDoS L3/L4/L7)**
+   - Menahan puluhan/ratusan ribu request bot liar sebelum mencapai IP VPS.
+2. **Lapis 2: Nginx Reverse Proxy (`frontend/nginx.conf`)**
+   - Dilengkapi `limit_req_zone` (maks 30 req/s, burst 50) dan `limit_conn_zone` (maks 25 koneksi simultan per IP).
+   - Memotong flood request di level web server C-engine yang sangat cepat tanpa membebani CPU Node.js.
+3. **Lapis 3: Express Rate Limiter (`backend/src/middleware/rateLimiter.ts`)**
+   - **Global API**: Maks 180 req / 1 menit per IP.
+   - **Pembuatan Pesanan / QRIS**: Maks 10 pesanan / 10 menit per IP (mencegah spam order & zombie QRIS).
+   - **Validasi No. HP / WhatsApp**: Maks 15 req / 5 menit per IP (hemat kuota API WA Fonnte).
+   - **Polling Status Pembayaran**: Maks 60 req / 1 menit per IP (ramah polling frontend 3.5 detik).
+   - **Admin & Autentikasi**: Maks 20 req / 15 menit untuk unauthenticated probing.
+   - **Midtrans Webhook**: Dibypass otomatis (*whitelisted*) agar notifikasi lunas QRIS selalu berhasil masuk.
+
+---
+
+### B. Langkah Menghubungkan Cloudflare (Gratis & Sangat Dianjurkan)
+Untuk perlindungan DDoS terbaik tanpa biaya tambahan:
+1. Daftarkan domain Anda di **[Cloudflare](https://dash.cloudflare.com/)** (Pilih Free Plan).
+2. Arahkan Nameserver domain di registrar (Niagahoster/Domainesia/Namecheap dll) ke Nameserver Cloudflare.
+3. Di tab **DNS Records**, pastikan icon awan berstatus **Proxied (Awan Oranye ☁️🧡)** untuk `domainanda.com` dan `www.domainanda.com`.
+4. Buka menu **Security** -> **Bots** -> Aktifkan **Bot Fight Mode**.
+5. Jika sewaktu-waktu mengalami serangan DDoS brutal, aktifkan fitur darurat **"Under Attack Mode"** di dashboard Cloudflare utama hanya dengan 1 klik.
+
+---
+
+### C. Mengaktifkan Firewall UFW di VPS
+Pastikan port internal database atau port backend (5001) tidak terbuka bebas ke internet. Hanya buka port SSH (22), HTTP (80), dan HTTPS (443):
+
+```bash
+# Izinkan koneksi SSH terlebih dahulu agar tidak terkunci keluar
+sudo ufw allow 22/tcp
+
+# Izinkan port web publik
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+
+# Aktifkan firewall
+sudo ufw enable
+
+# Cek status firewall
+sudo ufw status verbose
+```
+

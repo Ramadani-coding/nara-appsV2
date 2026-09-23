@@ -14,6 +14,7 @@ import {
 import { db } from "../db/index.js";
 import { orders } from "../db/schema.js";
 import { eq, desc, like, or } from "drizzle-orm";
+import { createOrderLimiter, phoneValidationLimiter } from "../middleware/rateLimiter.js";
 
 const router = Router();
 
@@ -113,7 +114,7 @@ router.get("/recent-sales", async (_req: Request, res: Response) => {
  * POST /api/orders/validate-phone
  * Memvalidasi nomor WhatsApp pemesan dengan filter operator seluler Indonesia dan Fonnte API
  */
-router.post("/validate-phone", async (req: Request, res: Response) => {
+router.post("/validate-phone", phoneValidationLimiter, async (req: Request, res: Response) => {
   try {
     const { phone } = req.body;
     if (!phone || !String(phone).trim()) {
@@ -144,7 +145,7 @@ router.post("/validate-phone", async (req: Request, res: Response) => {
  * POST /api/orders
  * Membuat pesanan baru dan menghasilkan transaksi QRIS Midtrans Core API
  */
-router.post("/", async (req: Request, res: Response) => {
+router.post("/", createOrderLimiter, async (req: Request, res: Response) => {
   try {
     const {
       productId,
@@ -202,7 +203,7 @@ router.post("/", async (req: Request, res: Response) => {
  * POST /api/orders/:orderNumber/verify-phone
  * Memverifikasi nomor WhatsApp pemesan untuk membuka kunci (unlock) kredensial akun digital
  */
-router.post("/:orderNumber/verify-phone", async (req: Request, res: Response) => {
+router.post("/:orderNumber/verify-phone", phoneValidationLimiter, async (req: Request, res: Response) => {
   try {
     const { orderNumber } = req.params;
     const { phone } = req.body;

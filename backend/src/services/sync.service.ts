@@ -19,7 +19,7 @@ export const DEFAULT_CATEGORIES = [
 export function categorizeProduct(name: string, productType: string): string {
   const combined = `${name} ${productType}`.toLowerCase();
 
-  if (combined.includes("canva") || combined.includes("alight") || combined.includes("am exp")) {
+  if (combined.includes("canva") || combined.includes("alight") || combined.includes("am exp") || /\bam\b/.test(combined)) {
     return "desain-kreatif";
   }
   if (combined.includes("capcut") || combined.includes("wink") || combined.includes("video edit")) {
@@ -28,17 +28,19 @@ export function categorizeProduct(name: string, productType: string): string {
   if (
     combined.includes("viu") ||
     combined.includes("netflix") ||
+    /\bnf\b/.test(combined) ||
     combined.includes("prime") ||
     combined.includes("vidio") ||
-    combined.includes("vd mobile") ||
+    /\bvd\b/.test(combined) ||
     combined.includes("wetv") ||
     combined.includes("disney") ||
+    combined.includes("hotstar") ||
     combined.includes("drama") ||
     combined.includes("streaming")
   ) {
     return "streaming-film";
   }
-  if (combined.includes("spotify") || combined.includes("youtube") || combined.includes("yt") || combined.includes("musik")) {
+  if (combined.includes("spotify") || combined.includes("youtube") || /\byt\b/.test(combined) || combined.includes("musik")) {
     return "musik-audio";
   }
   if (combined.includes("gemini") || combined.includes("chatgpt") || combined.includes("gpt") || combined.includes("ai")) {

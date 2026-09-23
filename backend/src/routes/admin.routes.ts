@@ -14,8 +14,12 @@ import { syncService } from "../services/sync.service.js";
 import { premiumkuService } from "../services/premiumku.service.js";
 import { orderService } from "../services/order.service.js";
 import { adminAuthMiddleware, type AuthenticatedAdminRequest } from "../middleware/adminAuth.js";
+import { adminAuthLimiter } from "../middleware/rateLimiter.js";
 
 const router = Router();
+
+// Rate limiter khusus rute admin untuk menangkal brute-force & probing
+router.use(adminAuthLimiter);
 
 // Strict Security: All /api/admin/* routes require a verified Supabase Admin JWT
 router.use(adminAuthMiddleware);

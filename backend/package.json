@@ -18,13 +18,15 @@
     "seed:admin": "tsx src/scripts/seed-admin.ts",
     "db:clear-transactions": "tsx src/scripts/clear-transactions.ts",
     "test:gowa": "tsx src/scripts/test-gowa.ts",
-    "test:bot": "tsx src/scripts/test-bot-flow.ts"
+    "test:bot": "tsx src/scripts/test-bot-flow.ts",
+    "test:rate-limit": "tsx src/scripts/test-rate-limit.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.45.1",
     "express": "^4.21.2",
+    "express-rate-limit": "^8.7.0",
     "postgres": "^3.4.5"
   },
   "devDependencies": {

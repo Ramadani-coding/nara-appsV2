@@ -32,14 +32,14 @@ function detectServiceIdForProduct(name: string): string {
   const n = name.toLowerCase().trim();
   if (n.includes('capcut')) return 'capcut';
   if (n.includes('canva')) return 'canva';
-  if (n.includes('alight')) return 'alight-motion';
-  if (n.includes('netflix')) return 'netflix';
+  if (n.includes('alight') || /\bam\b/.test(n)) return 'alight-motion';
+  if (n.includes('netflix') || /\bnf\b/.test(n)) return 'netflix';
   if (n.includes('spotify')) return 'spotify';
   if (n.includes('prime')) return 'prime-video';
-  if (n.includes('youtube')) return 'youtube';
+  if (n.includes('youtube') || /\byt\b/.test(n)) return 'youtube';
   if (n.includes('viu')) return 'viu';
-  if (n.includes('vidio') || n.includes('vd mobile')) return 'vidio';
-  if (n.includes('disney')) return 'disney';
+  if (n.includes('vidio') || /\bvd\b/.test(n) || n.startsWith('vd ') || n.startsWith('vd-')) return 'vidio';
+  if (n.includes('disney') || n.includes('hotstar')) return 'disney';
   if (n.includes('drama') || n.includes('wetv') || n.includes('dracin')) return 'akses-drama';
   if (n.includes('wink')) return 'wink';
   if (n.includes('meitu')) return 'meitu';
@@ -54,6 +54,7 @@ function detectServiceIdForProduct(name: string): string {
 function createServiceForProduct(serviceId: string, rawItem: any): ServiceProduct {
   const rawName = String(rawItem.name || '');
   let serviceName = rawName.split(/[\s_-]+/)[0];
+  if (serviceId === 'vidio') serviceName = 'Vidio Premier';
   if (serviceId === 'iqiyi') serviceName = 'iQIYI Premium';
   if (serviceId === 'meitu') serviceName = 'Meitu';
 
@@ -340,6 +341,31 @@ class CatalogStore {
     }
   }
 
+  public removeProductData(oldItem: any) {
+    if (!oldItem) return;
+    const providerServiceId = String(oldItem.providerServiceId ?? oldItem.provider_service_id ?? '');
+    const oldId = String(oldItem.id ?? '');
+
+    let hasChanged = false;
+    for (const service of this.services) {
+      const initialLength = service.packages.length;
+      service.packages = service.packages.filter(pkg => {
+        const matchesProvider = providerServiceId && String(pkg.providerId) === providerServiceId;
+        const matchesId = oldId && pkg.id.includes(oldId);
+        return !matchesProvider && !matchesId;
+      });
+      if (service.packages.length !== initialLength) {
+        hasChanged = true;
+        const activePkgs = service.packages.filter(p => p.isActive !== false);
+        service.isActive = activePkgs.length > 0;
+        service.tagline = computeServiceTagline(service);
+      }
+    }
+    if (hasChanged) {
+      this.notify();
+    }
+  }
+
   public async init() {
     if (this.isInitialized) return;
     this.isInitialized = true;
@@ -348,8 +374,40 @@ class CatalogStore {
     try {
       const liveList = await fetchLiveProducts();
       if (Array.isArray(liveList) && liveList.length > 0) {
+        const activeProviderIds = new Set(
+          liveList
+            .filter(item => item.isActive !== false)
+            .map(item => String(item.providerServiceId ?? item.id))
+        );
+
         for (const item of liveList) {
           this.applyProductData(item);
+        }
+
+        // Sinkronkan status aktif: Jika sebuah paket memiliki providerId tetapi TIDAK ADA di liveList aktif,
+        // berarti produk tersebut dinonaktifkan di admin atau sudah dihapus dari toko.
+        let hasChanges = false;
+        for (const service of this.services) {
+          let serviceChanged = false;
+          for (const pkg of service.packages) {
+            if (pkg.providerId && !activeProviderIds.has(String(pkg.providerId))) {
+              if (pkg.isActive !== false) {
+                pkg.isActive = false;
+                pkg.stockCount = 0;
+                serviceChanged = true;
+                hasChanges = true;
+              }
+            }
+          }
+          if (serviceChanged) {
+            service.tagline = computeServiceTagline(service);
+            const activePkgs = service.packages.filter(p => p.isActive !== false);
+            service.isActive = activePkgs.length > 0;
+          }
+        }
+
+        if (hasChanges) {
+          this.notify();
         }
       }
     } catch (err) {
@@ -364,8 +422,10 @@ class CatalogStore {
           'postgres_changes',
           { event: '*', schema: 'public', table: 'products' },
           (payload) => {
-            console.log('⚡ Realtime catalog update received:', payload.eventType, payload.new);
-            if (payload.new) {
+            console.log('⚡ Realtime catalog update received:', payload.eventType, payload.new || payload.old);
+            if (payload.eventType === 'DELETE' && payload.old) {
+              this.removeProductData(payload.old);
+            } else if (payload.new) {
               this.applyProductData(payload.new);
             }
           }
@@ -382,7 +442,9 @@ class CatalogStore {
       if ('BroadcastChannel' in window) {
         this.broadcastChannel = new BroadcastChannel('nara_catalog_sync');
         this.broadcastChannel.onmessage = (event) => {
-          if (event.data?.type === 'PRODUCT_UPDATED' && event.data?.product) {
+          if (event.data?.type === 'PRODUCT_DELETED' && event.data?.product) {
+            this.removeProductData(event.data.product);
+          } else if (event.data?.type === 'PRODUCT_UPDATED' && event.data?.product) {
             this.applyProductData(event.data.product);
           }
         };
@@ -395,6 +457,12 @@ class CatalogStore {
         this.applyProductData(event.detail);
       }
     });
+
+    window.addEventListener('nara:product-deleted', (event: any) => {
+      if (event.detail) {
+        this.removeProductData(event.detail);
+      }
+    });
   }
 
   public broadcastUpdate(product: any) {
@@ -402,6 +470,15 @@ class CatalogStore {
     try {
       if (this.broadcastChannel) {
         this.broadcastChannel.postMessage({ type: 'PRODUCT_UPDATED', product });
+      }
+    } catch (_e) {}
+  }
+
+  public broadcastDelete(product: any) {
+    this.removeProductData(product);
+    try {
+      if (this.broadcastChannel) {
+        this.broadcastChannel.postMessage({ type: 'PRODUCT_DELETED', product });
       }
     } catch (_e) {}
   }

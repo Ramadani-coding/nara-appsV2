@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { midtransService } from "../services/midtrans.service.js";
 import { orderService, parseMidtransExpiry } from "../services/order.service.js";
+import { paymentStatusLimiter } from "../middleware/rateLimiter.js";
 
 const router = Router();
 
@@ -87,7 +88,7 @@ router.post("/webhook", handleMidtransNotification);
  * Cek status transaksi pembayaran QRIS secara real-time
  * (Digunakan oleh frontend polling halaman pembayaran)
  */
-router.get("/:orderNumber/status", async (req: Request, res: Response) => {
+router.get("/:orderNumber/status", paymentStatusLimiter, async (req: Request, res: Response) => {
   try {
     const { orderNumber } = req.params;
     if (!orderNumber) {
