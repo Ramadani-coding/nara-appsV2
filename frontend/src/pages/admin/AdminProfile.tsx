@@ -191,10 +191,11 @@ export default function AdminProfile() {
         </div>
 
         <button
+          type="button"
           onClick={logout}
-          className="px-4 py-2.5 bg-red-100 hover:bg-red-200 text-red-800 dark:bg-red-950 dark:text-red-300 font-black text-xs uppercase border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] neo-btn rounded-xl flex items-center gap-2 cursor-pointer self-start sm:self-auto"
+          className="px-4 py-2.5 min-h-[44px] bg-red-100 hover:bg-red-200 text-red-800 dark:bg-red-950 dark:text-red-300 font-black text-xs uppercase border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] neo-btn rounded-xl flex items-center gap-2 cursor-pointer self-start sm:self-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
         >
-          <LogOut className="w-4 h-4" />
+          <LogOut className="w-4 h-4" aria-hidden="true" />
           <span>Keluar Sesi</span>
         </button>
       </div>
@@ -249,36 +250,44 @@ export default function AdminProfile() {
               
               {/* Nama Lengkap */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-black uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                <label 
+                  htmlFor="admin-full-name"
+                  className="block text-xs font-black uppercase tracking-wider text-gray-700 dark:text-gray-300 cursor-pointer"
+                >
                   Nama Lengkap Admin
                 </label>
                 <div className="relative">
-                  <User className="w-4 h-4 text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <User className="w-4 h-4 text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
                   <input
+                    id="admin-full-name"
                     type="text"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="Nama Pengelola"
                     required
-                    className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] text-sm font-bold rounded-xl focus:outline-none focus:border-brand-blue"
+                    className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] text-sm font-bold rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue"
                   />
                 </div>
               </div>
 
               {/* Email Address */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-black uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                <label 
+                  htmlFor="admin-email-input"
+                  className="block text-xs font-black uppercase tracking-wider text-gray-700 dark:text-gray-300 cursor-pointer"
+                >
                   Alamat Email (Username Login)
                 </label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <Mail className="w-4 h-4 text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
                   <input
+                    id="admin-email-input"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="admin@narapremium.com"
                     required
-                    className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] text-sm font-bold font-mono rounded-xl focus:outline-none focus:border-brand-blue"
+                    className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] text-sm font-bold font-mono rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue"
                   />
                 </div>
                 <p className="text-[11px] text-gray-500 font-medium">
@@ -291,7 +300,7 @@ export default function AdminProfile() {
                 <div className="p-3 bg-gray-50 dark:bg-[#12141C] border border-gray-200 dark:border-gray-800 rounded-xl space-y-1">
                   <div className="text-[10px] font-black uppercase text-gray-500">HAK AKSES / PERAN</div>
                   <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-brand-yellow text-black border border-black rounded font-black text-xs uppercase">
-                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />
                     <span>ADMINISTRATOR</span>
                   </div>
                 </div>
@@ -309,16 +318,16 @@ export default function AdminProfile() {
                 <button
                   type="submit"
                   disabled={savingProfile}
-                  className="w-full sm:w-auto px-6 py-2.5 bg-brand-blue hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] neo-btn rounded-xl flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  className="w-full sm:w-auto px-6 py-2.5 min-h-[44px] bg-brand-blue hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] neo-btn rounded-xl flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue"
                 >
                   {savingProfile ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
                       <span>Menyimpan...</span>
                     </>
                   ) : (
                     <>
-                      <Save className="w-4 h-4" />
+                      <Save className="w-4 h-4" aria-hidden="true" />
                       <span>Simpan Perubahan Profil</span>
                     </>
                   )}
@@ -385,51 +394,61 @@ export default function AdminProfile() {
               
               {/* Current Password */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-black uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                <label 
+                  htmlFor="admin-current-pass"
+                  className="block text-xs font-black uppercase tracking-wider text-gray-700 dark:text-gray-300 cursor-pointer"
+                >
                   Kata Sandi Saat Ini
                 </label>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <Lock className="w-4 h-4 text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
                   <input
+                    id="admin-current-pass"
                     type={showCurrent ? "text" : "password"}
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
                     placeholder="Masukkan sandi aktif"
                     required
-                    className="w-full pl-10 pr-10 py-2.5 bg-white dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] text-sm font-medium rounded-xl focus:outline-none focus:border-brand-blue"
+                    className="w-full pl-10 pr-11 py-2.5 bg-white dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] text-sm font-medium rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue"
                   />
                   <button
                     type="button"
                     onClick={() => setShowCurrent(!showCurrent)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-black dark:hover:text-white p-1 cursor-pointer"
+                    aria-label={showCurrent ? "Sembunyikan kata sandi saat ini" : "Tampilkan kata sandi saat ini"}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 min-w-[36px] min-h-[36px] flex items-center justify-center text-gray-500 hover:text-black dark:hover:text-white cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue"
                   >
-                    {showCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showCurrent ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
                   </button>
                 </div>
               </div>
 
               {/* New Password */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-black uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                <label 
+                  htmlFor="admin-new-pass"
+                  className="block text-xs font-black uppercase tracking-wider text-gray-700 dark:text-gray-300 cursor-pointer"
+                >
                   Kata Sandi Baru (Min. 8 Karakter)
                 </label>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <Lock className="w-4 h-4 text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
                   <input
+                    id="admin-new-pass"
                     type={showNew ? "text" : "password"}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="Sandi baru minimal 8 digit"
                     required
                     minLength={8}
-                    className="w-full pl-10 pr-10 py-2.5 bg-white dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] text-sm font-medium rounded-xl focus:outline-none focus:border-brand-blue"
+                    className="w-full pl-10 pr-11 py-2.5 bg-white dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] text-sm font-medium rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue"
                   />
                   <button
                     type="button"
                     onClick={() => setShowNew(!showNew)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-black dark:hover:text-white p-1 cursor-pointer"
+                    aria-label={showNew ? "Sembunyikan kata sandi baru" : "Tampilkan kata sandi baru"}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 min-w-[36px] min-h-[36px] flex items-center justify-center text-gray-500 hover:text-black dark:hover:text-white cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue"
                   >
-                    {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showNew ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
                   </button>
                 </div>
 
@@ -442,7 +461,14 @@ export default function AdminProfile() {
                         {strengthInfo.label}
                       </span>
                     </div>
-                    <div className="w-full bg-gray-100 dark:bg-gray-800 h-1.5 rounded-full overflow-hidden border border-black/30 dark:border-gray-700">
+                    <div 
+                      role="progressbar"
+                      aria-label="Kekuatan kata sandi"
+                      aria-valuenow={passStrength}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      className="w-full bg-gray-100 dark:bg-gray-800 h-2 rounded-full overflow-hidden border border-black/30 dark:border-gray-700"
+                    >
                       <div 
                         className={`h-full transition-all duration-300 ${
                           passStrength < 40 
@@ -460,25 +486,30 @@ export default function AdminProfile() {
 
               {/* Confirm New Password */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-black uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                <label 
+                  htmlFor="admin-confirm-pass"
+                  className="block text-xs font-black uppercase tracking-wider text-gray-700 dark:text-gray-300 cursor-pointer"
+                >
                   Konfirmasi Kata Sandi Baru
                 </label>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <Lock className="w-4 h-4 text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
                   <input
+                    id="admin-confirm-pass"
                     type={showConfirm ? "text" : "password"}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Ulangi kata sandi baru"
                     required
-                    className="w-full pl-10 pr-10 py-2.5 bg-white dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] text-sm font-medium rounded-xl focus:outline-none focus:border-brand-blue"
+                    className="w-full pl-10 pr-11 py-2.5 bg-white dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] text-sm font-medium rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue"
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirm(!showConfirm)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-black dark:hover:text-white p-1 cursor-pointer"
+                    aria-label={showConfirm ? "Sembunyikan konfirmasi kata sandi" : "Tampilkan konfirmasi kata sandi"}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 min-w-[36px] min-h-[36px] flex items-center justify-center text-gray-500 hover:text-black dark:hover:text-white cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue"
                   >
-                    {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showConfirm ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
                   </button>
                 </div>
 
@@ -486,12 +517,12 @@ export default function AdminProfile() {
                   <div className="text-[11px] font-bold">
                     {newPassword === confirmPassword ? (
                       <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3" />
+                        <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
                         <span>Kata sandi cocok</span>
                       </span>
                     ) : (
                       <span className="text-red-600 dark:text-red-400 flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3" />
+                        <AlertCircle className="w-3 h-3" aria-hidden="true" />
                         <span>Kata sandi tidak cocok</span>
                       </span>
                     )}
@@ -504,16 +535,16 @@ export default function AdminProfile() {
                 <button
                   type="submit"
                   disabled={savingPassword || (newPassword !== confirmPassword && confirmPassword.length > 0)}
-                  className="w-full py-3 bg-brand-pink hover:bg-pink-600 text-white font-black text-xs uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] neo-btn rounded-xl flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  className="w-full py-3 min-h-[44px] bg-brand-pink hover:bg-pink-600 text-white font-black text-xs uppercase tracking-wider border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] neo-btn rounded-xl flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-pink"
                 >
                   {savingPassword ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
                       <span>Memverifikasi & Menyimpan...</span>
                     </>
                   ) : (
                     <>
-                      <Sparkles className="w-4 h-4" />
+                      <Sparkles className="w-4 h-4" aria-hidden="true" />
                       <span>Perbarui Kata Sandi</span>
                     </>
                   )}

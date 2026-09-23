@@ -138,7 +138,7 @@ export default function AdminDashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-brand-yellow border-2 border-black shadow-[2px_2px_0px_#000] font-black text-xs uppercase tracking-wider mb-2">
-            <span className="w-2 h-2 rounded-full bg-black animate-ping" />
+            <span className="w-2 h-2 rounded-full bg-black animate-ping" aria-hidden="true" />
             <span>RINGKASAN PERFORMA</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-black dark:text-white leading-tight">
@@ -152,18 +152,21 @@ export default function AdminDashboard() {
         {/* Quick Action Buttons */}
         <div className="flex items-center gap-3">
           <button
+            type="button"
             onClick={fetchStats}
+            aria-label="Muat ulang data statistik dashboard"
             title="Muat ulang data statistik"
-            className="px-3.5 py-2.5 bg-white dark:bg-[#1E2333] hover:bg-gray-100 dark:hover:bg-gray-800 text-black dark:text-white font-extrabold text-xs uppercase border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] neo-btn rounded-xl flex items-center gap-2 cursor-pointer"
+            className="px-3.5 py-2.5 bg-white dark:bg-[#1E2333] hover:bg-gray-100 dark:hover:bg-gray-800 text-black dark:text-white font-extrabold text-xs uppercase border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] neo-btn rounded-xl flex items-center gap-2 cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-blue outline-none"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
             <span className="hidden sm:inline">Refresh</span>
           </button>
 
           <button
+            type="button"
             onClick={handleSyncProducts}
             disabled={syncing}
-            className="px-4 py-2.5 bg-brand-blue hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] neo-btn rounded-xl flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            className="px-4 py-2.5 bg-brand-blue hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] neo-btn rounded-xl flex items-center gap-2 cursor-pointer disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-blue-400 outline-none"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`} />
             <span>{syncing ? "Menyinkronkan..." : "Sinkronisasi Premku"}</span>
@@ -199,7 +202,13 @@ export default function AdminDashboard() {
             </div>
           </div>
           <div className="text-xl sm:text-2xl font-black text-black dark:text-white tracking-tight">
-            {stats ? formatRupiah(stats.totalRevenue) : "Rp 0"}
+            {stats ? (
+              formatRupiah(stats.totalRevenue)
+            ) : loading ? (
+              <span className="inline-block w-28 h-7 bg-gray-200 dark:bg-gray-700 animate-pulse rounded" />
+            ) : (
+              "Rp 0"
+            )}
           </div>
           <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
             <CheckCircle2 className="w-3 h-3" />
@@ -218,7 +227,13 @@ export default function AdminDashboard() {
             </div>
           </div>
           <div className="text-xl sm:text-2xl font-black text-black dark:text-white tracking-tight">
-            {stats ? `${stats.totalOrders} Transaksi` : "0 Transaksi"}
+            {stats ? (
+              `${stats.totalOrders} Transaksi`
+            ) : loading ? (
+              <span className="inline-block w-24 h-7 bg-gray-200 dark:bg-gray-700 animate-pulse rounded" />
+            ) : (
+              "0 Transaksi"
+            )}
           </div>
           <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 mt-1">
             {stats?.statusCounts?.completed || 0} selesai, {stats?.statusCounts?.processing || 0} diproses
@@ -236,7 +251,13 @@ export default function AdminDashboard() {
             </div>
           </div>
           <div className="text-xl sm:text-2xl font-black text-black dark:text-white tracking-tight">
-            {stats ? formatRupiah(stats.premkuSaldo) : "Rp 0"}
+            {stats ? (
+              formatRupiah(stats.premkuSaldo)
+            ) : loading ? (
+              <span className="inline-block w-24 h-7 bg-gray-200 dark:bg-gray-700 animate-pulse rounded" />
+            ) : (
+              "Rp 0"
+            )}
           </div>
           <p className="text-[11px] font-bold text-brand-pink mt-1">
             Dana pemenuhan otomatis API
@@ -254,7 +275,13 @@ export default function AdminDashboard() {
             </div>
           </div>
           <div className="text-xl sm:text-2xl font-black text-black dark:text-white tracking-tight">
-            {stats ? `${stats.activeProducts} / ${stats.totalProducts}` : "0"}
+            {stats ? (
+              `${stats.activeProducts} / ${stats.totalProducts}`
+            ) : loading ? (
+              <span className="inline-block w-20 h-7 bg-gray-200 dark:bg-gray-700 animate-pulse rounded" />
+            ) : (
+              "0"
+            )}
           </div>
           <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400 mt-1">
             {stats?.emptyStockProducts || 0} produk kehabisan stok
@@ -281,7 +308,8 @@ export default function AdminDashboard() {
             </div>
             <Link
               to="/admin/orders"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-yellow text-black font-extrabold text-xs uppercase border-2 border-black shadow-[2px_2px_0px_#000] neo-btn rounded-xl"
+              aria-label="Lihat seluruh daftar pesanan"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-yellow text-black font-extrabold text-xs uppercase border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] neo-btn rounded-xl focus-visible:ring-2 focus-visible:ring-brand-blue outline-none"
             >
               <span>Semua Pesanan</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -293,11 +321,11 @@ export default function AdminDashboard() {
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b-2 border-black dark:border-gray-700 text-gray-500 dark:text-gray-400 font-black uppercase text-[10px]">
-                  <th className="py-2.5 px-2">Order #</th>
-                  <th className="py-2.5 px-2">Pembeli</th>
-                  <th className="py-2.5 px-2">Total</th>
-                  <th className="py-2.5 px-2">Status</th>
-                  <th className="py-2.5 px-2 text-right">Aksi</th>
+                  <th scope="col" className="py-2.5 px-2">Order #</th>
+                  <th scope="col" className="py-2.5 px-2">Pembeli</th>
+                  <th scope="col" className="py-2.5 px-2">Total</th>
+                  <th scope="col" className="py-2.5 px-2">Status</th>
+                  <th scope="col" className="py-2.5 px-2 text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700 font-medium">
@@ -324,7 +352,8 @@ export default function AdminDashboard() {
                       <td className="py-3 px-2 text-right whitespace-nowrap">
                         <Link
                           to={`/admin/orders?search=${order.orderNumber}`}
-                          className="px-2.5 py-1 bg-white dark:bg-[#151821] text-black dark:text-white font-extrabold text-[10px] uppercase border border-black dark:border-gray-700 shadow-[1px_1px_0px_#000] hover:bg-brand-yellow rounded"
+                          aria-label={`Buka detail pesanan ${order.orderNumber}`}
+                          className="px-2.5 py-1 bg-white dark:bg-[#151821] text-black dark:text-white font-extrabold text-[10px] uppercase border border-black dark:border-gray-700 shadow-[1px_1px_0px_#000] hover:bg-brand-yellow rounded focus-visible:ring-2 focus-visible:ring-brand-blue outline-none"
                         >
                           Detail
                         </Link>
@@ -377,7 +406,8 @@ export default function AdminDashboard() {
                     </div>
                     <Link
                       to={`/admin/orders?search=${order.orderNumber}`}
-                      className="px-3.5 py-1.5 bg-brand-yellow text-black font-extrabold text-xs uppercase border-2 border-black shadow-[2px_2px_0px_#000] neo-btn rounded-lg"
+                      aria-label={`Buka detail pesanan ${order.orderNumber}`}
+                      className="px-3.5 py-1.5 bg-brand-yellow text-black font-extrabold text-xs uppercase border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] neo-btn rounded-lg min-h-[36px] inline-flex items-center"
                     >
                       Buka Detail
                     </Link>
@@ -412,8 +442,13 @@ export default function AdminDashboard() {
                 </div>
                 <div className="w-full bg-gray-100 dark:bg-gray-800 h-2 rounded border border-black dark:border-gray-700 overflow-hidden">
                   <div 
-                    className="bg-emerald-500 h-full" 
-                    style={{ width: `${stats?.totalOrders ? ((stats.statusCounts.completed || 0) / stats.totalOrders) * 100 : 0}%` }}
+                    role="progressbar"
+                    aria-valuenow={stats?.totalOrders ? Math.round(((stats.statusCounts?.completed || 0) / stats.totalOrders) * 100) : 0}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label="Persentase pesanan selesai"
+                    className="bg-emerald-500 h-full transition-all duration-300" 
+                    style={{ width: `${stats?.totalOrders ? ((stats.statusCounts?.completed || 0) / stats.totalOrders) * 100 : 0}%` }}
                   />
                 </div>
               </div>
@@ -428,8 +463,13 @@ export default function AdminDashboard() {
                 </div>
                 <div className="w-full bg-gray-100 dark:bg-gray-800 h-2 rounded border border-black dark:border-gray-700 overflow-hidden">
                   <div 
-                    className="bg-amber-500 h-full" 
-                    style={{ width: `${stats?.totalOrders ? ((stats.statusCounts.processing || 0) / stats.totalOrders) * 100 : 0}%` }}
+                    role="progressbar"
+                    aria-valuenow={stats?.totalOrders ? Math.round(((stats.statusCounts?.processing || 0) / stats.totalOrders) * 100) : 0}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label="Persentase pesanan sedang diproses"
+                    className="bg-amber-500 h-full transition-all duration-300" 
+                    style={{ width: `${stats?.totalOrders ? ((stats.statusCounts?.processing || 0) / stats.totalOrders) * 100 : 0}%` }}
                   />
                 </div>
               </div>
@@ -444,8 +484,13 @@ export default function AdminDashboard() {
                 </div>
                 <div className="w-full bg-gray-100 dark:bg-gray-800 h-2 rounded border border-black dark:border-gray-700 overflow-hidden">
                   <div 
-                    className="bg-brand-blue h-full" 
-                    style={{ width: `${stats?.totalOrders ? ((stats.statusCounts.paid || 0) / stats.totalOrders) * 100 : 0}%` }}
+                    role="progressbar"
+                    aria-valuenow={stats?.totalOrders ? Math.round(((stats.statusCounts?.paid || 0) / stats.totalOrders) * 100) : 0}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label="Persentase pesanan lunas"
+                    className="bg-brand-blue h-full transition-all duration-300" 
+                    style={{ width: `${stats?.totalOrders ? ((stats.statusCounts?.paid || 0) / stats.totalOrders) * 100 : 0}%` }}
                   />
                 </div>
               </div>
@@ -460,8 +505,13 @@ export default function AdminDashboard() {
                 </div>
                 <div className="w-full bg-gray-100 dark:bg-gray-800 h-2 rounded border border-black dark:border-gray-700 overflow-hidden">
                   <div 
-                    className="bg-yellow-400 h-full" 
-                    style={{ width: `${stats?.totalOrders ? ((stats.statusCounts.waiting_payment || 0) / stats.totalOrders) * 100 : 0}%` }}
+                    role="progressbar"
+                    aria-valuenow={stats?.totalOrders ? Math.round(((stats.statusCounts?.waiting_payment || 0) / stats.totalOrders) * 100) : 0}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label="Persentase pesanan menunggu bayar"
+                    className="bg-yellow-400 h-full transition-all duration-300" 
+                    style={{ width: `${stats?.totalOrders ? ((stats.statusCounts?.waiting_payment || 0) / stats.totalOrders) * 100 : 0}%` }}
                   />
                 </div>
               </div>

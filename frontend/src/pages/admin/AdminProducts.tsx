@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Search, 
@@ -123,12 +123,14 @@ export default function AdminProducts() {
         // Revert jika gagal
         setProducts(prev => prev.map(p => p.id === product.id ? { ...p, isActive: product.isActive } : p));
         broadcastCatalogProductUpdate({ ...product, isActive: product.isActive, is_active: product.isActive });
-        alert(`Gagal: ${json.message}`);
+        setToastMsg(`❌ Gagal: ${json.message}`);
+        setTimeout(() => setToastMsg(null), 3500);
       }
     } catch (err: any) {
       setProducts(prev => prev.map(p => p.id === product.id ? { ...p, isActive: product.isActive } : p));
       broadcastCatalogProductUpdate({ ...product, isActive: product.isActive, is_active: product.isActive });
-      alert(`Error: ${err.message}`);
+      setToastMsg(`❌ Error: ${err.message}`);
+      setTimeout(() => setToastMsg(null), 3500);
     } finally {
       setTogglingId(null);
     }
@@ -157,10 +159,12 @@ export default function AdminProducts() {
         setToastMsg(`✅ Margin ${marginModalProduct.name} berhasil diperbarui.`);
         setTimeout(() => setToastMsg(null), 3500);
       } else {
-        alert(`Gagal: ${json.message}`);
+        setToastMsg(`❌ Gagal menyimpan margin: ${json.message}`);
+        setTimeout(() => setToastMsg(null), 3500);
       }
     } catch (err: any) {
-      alert(`Error: ${err.message}`);
+      setToastMsg(`❌ Error: ${err.message}`);
+      setTimeout(() => setToastMsg(null), 3500);
     } finally {
       setSavingMargin(false);
     }
@@ -195,14 +199,28 @@ export default function AdminProducts() {
         setToastMsg(`✅ Informasi produk diperbarui.`);
         setTimeout(() => setToastMsg(null), 3500);
       } else {
-        alert(`Gagal: ${json.message}`);
+        setToastMsg(`❌ Gagal: ${json.message}`);
+        setTimeout(() => setToastMsg(null), 3500);
       }
     } catch (err: any) {
-      alert(`Error: ${err.message}`);
+      setToastMsg(`❌ Error: ${err.message}`);
+      setTimeout(() => setToastMsg(null), 3500);
     } finally {
       setSavingEdit(false);
     }
   };
+
+  // Close modals on Escape key press
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (marginModalProduct) setMarginModalProduct(null);
+        if (editProduct) setEditProduct(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [marginModalProduct, editProduct]);
 
   const formatRupiah = (num: number) => {
     return new Intl.NumberFormat("id-ID", {
@@ -212,18 +230,24 @@ export default function AdminProducts() {
     }).format(num);
   };
 
-  // Extract unique categories for filter
-  const categories = Array.from(
-    new Set(products.map(p => p.category?.name).filter(Boolean))
-  ) as string[];
+  // Memoized unique categories for filter
+  const categories = useMemo(() => {
+    return Array.from(
+      new Set(products.map(p => p.category?.name).filter(Boolean))
+    ) as string[];
+  }, [products]);
 
-  const filteredProducts = products.filter(p => {
-    const matchesCat = categoryFilter === "all" || p.category?.name === categoryFilter;
-    const matchesQuery = !searchQuery.trim() || 
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.providerServiceId.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCat && matchesQuery;
-  });
+  // Memoized filtered products list
+  const filteredProducts = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return products.filter(p => {
+      const matchesCat = categoryFilter === "all" || p.category?.name === categoryFilter;
+      const matchesQuery = !q || 
+        p.name.toLowerCase().includes(q) ||
+        p.providerServiceId.toLowerCase().includes(q);
+      return matchesCat && matchesQuery;
+    });
+  }, [products, categoryFilter, searchQuery]);
 
   return (
     <div className="space-y-6 pb-16">
@@ -277,18 +301,20 @@ export default function AdminProducts() {
           <Search className="w-4 h-4 text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input 
             type="text"
+            aria-label="Cari nama produk atau provider ID"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Cari nama produk atau provider ID..."
-            className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] text-sm font-medium rounded-xl focus:outline-none focus:border-brand-blue text-black dark:text-white"
+            className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] text-sm font-medium rounded-xl focus:outline-none focus:border-brand-blue focus-visible:ring-2 focus-visible:ring-brand-blue text-black dark:text-white"
           />
         </div>
 
         {/* Category filter dropdown */}
         <select
           value={categoryFilter}
+          aria-label="Filter berdasarkan kategori produk"
           onChange={(e) => setCategoryFilter(e.target.value)}
-          className="px-4 py-2.5 bg-white dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] rounded-xl text-xs font-black uppercase text-black dark:text-white"
+          className="px-4 py-2.5 bg-white dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] rounded-xl text-xs font-black uppercase text-black dark:text-white focus-visible:ring-2 focus-visible:ring-brand-blue outline-none cursor-pointer"
         >
           <option value="all">Semua Kategori ({products.length})</option>
           {categories.map((c) => (
@@ -307,14 +333,14 @@ export default function AdminProducts() {
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="border-b-2 border-black dark:border-gray-700 bg-gray-50 dark:bg-[#12141C] text-gray-600 dark:text-gray-300 font-black uppercase text-[11px]">
-                <th className="py-3.5 px-4">Produk</th>
-                <th className="py-3.5 px-4">Kategori</th>
-                <th className="py-3.5 px-4">Harga Modal (Premku)</th>
-                <th className="py-3.5 px-4">Margin Flat (Rp)</th>
-                <th className="py-3.5 px-4">Harga Jual Akhir</th>
-                <th className="py-3.5 px-4">Stok</th>
-                <th className="py-3.5 px-4">Tampil di Toko</th>
-                <th className="py-3.5 px-4 text-right">Aksi</th>
+                <th scope="col" className="py-3.5 px-4">Produk</th>
+                <th scope="col" className="py-3.5 px-4">Kategori</th>
+                <th scope="col" className="py-3.5 px-4">Harga Modal (Premku)</th>
+                <th scope="col" className="py-3.5 px-4">Margin Flat (Rp)</th>
+                <th scope="col" className="py-3.5 px-4">Harga Jual Akhir</th>
+                <th scope="col" className="py-3.5 px-4">Stok</th>
+                <th scope="col" className="py-3.5 px-4">Tampil di Toko</th>
+                <th scope="col" className="py-3.5 px-4 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y-2 divide-gray-200 dark:divide-gray-800 font-medium">
@@ -339,6 +365,10 @@ export default function AdminProducts() {
                           <img 
                             src={p.imageUrl || "/placeholder.png"} 
                             alt={p.name}
+                            loading="lazy"
+                            decoding="async"
+                            width={40}
+                            height={40}
                             onError={(e: any) => { e.target.src = "/nara-logov2.png"; }}
                             className="w-10 h-10 rounded-lg border-2 border-black dark:border-gray-700 object-cover bg-gray-100 shrink-0 shadow-[1px_1px_0px_#000]"
                           />
@@ -368,9 +398,11 @@ export default function AdminProducts() {
                       {/* Margin Flat (Rupiah) */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <button
+                          type="button"
                           onClick={() => openMarginModal(p)}
-                          className="px-2.5 py-1 bg-brand-yellow hover:bg-yellow-400 text-black font-extrabold text-xs border border-black shadow-[1.5px_1.5px_0px_#000] rounded-lg cursor-pointer flex items-center gap-1.5"
+                          className="px-2.5 py-1 bg-brand-yellow hover:bg-yellow-400 text-black font-extrabold text-xs border border-black dark:border-gray-700 shadow-[1.5px_1.5px_0px_#000] rounded-lg cursor-pointer flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-brand-blue outline-none"
                           title="Klik untuk mengubah margin flat"
+                          aria-label={`Ubah margin flat untuk ${p.name}`}
                         >
                           <span>+ {formatRupiah(p.marginValue || 0)}</span>
                           <Edit3 className="w-3 h-3" />
@@ -386,8 +418,8 @@ export default function AdminProducts() {
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <span className={`px-2 py-0.5 text-[10px] font-bold rounded border ${
                           p.stockCount > 0
-                            ? "bg-emerald-100 text-emerald-800 border-emerald-500"
-                            : "bg-red-100 text-red-800 border-red-500"
+                            ? "bg-emerald-100 text-emerald-800 border-emerald-500 dark:bg-emerald-950 dark:text-emerald-300"
+                            : "bg-red-100 text-red-800 border-red-500 dark:bg-red-950 dark:text-red-300"
                         }`}>
                           {p.stockCount > 0 ? `${p.stockCount} Tersedia` : "Habis"}
                         </span>
@@ -396,9 +428,11 @@ export default function AdminProducts() {
                       {/* Toggle Active */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <button
+                          type="button"
                           onClick={() => handleToggleActive(p)}
                           disabled={togglingId === p.id}
-                          className={`px-3 py-1.5 rounded-xl font-black text-[11px] uppercase border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer transition-all active:translate-x-0.5 active:translate-y-0.5 ${
+                          aria-label={p.isActive ? `Nonaktifkan produk ${p.name}` : `Aktifkan produk ${p.name}`}
+                          className={`px-3 py-1.5 rounded-xl font-black text-[11px] uppercase border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer transition-all active:translate-x-0.5 active:translate-y-0.5 focus-visible:ring-2 focus-visible:ring-brand-blue outline-none ${
                             p.isActive
                               ? "bg-emerald-400 text-black hover:bg-emerald-500"
                               : "bg-rose-100 text-rose-700 hover:bg-rose-200 border-rose-600 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-500"
@@ -419,8 +453,10 @@ export default function AdminProducts() {
                       {/* Actions */}
                       <td className="py-3.5 px-4 text-right whitespace-nowrap">
                         <button
+                          type="button"
                           onClick={() => openEditModal(p)}
-                          className="px-2.5 py-1 bg-white dark:bg-[#151821] text-black dark:text-white font-extrabold text-[10px] uppercase border border-black dark:border-gray-700 shadow-[1px_1px_0px_#000] hover:bg-brand-yellow rounded-lg cursor-pointer"
+                          aria-label={`Sunting detail ${p.name}`}
+                          className="px-2.5 py-1 bg-white dark:bg-[#151821] text-black dark:text-white font-extrabold text-[10px] uppercase border border-black dark:border-gray-700 shadow-[1px_1px_0px_#000] hover:bg-brand-yellow rounded-lg cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-blue outline-none"
                         >
                           Sunting
                         </button>
@@ -563,7 +599,15 @@ export default function AdminProducts() {
          ======================================================== */}
       <AnimatePresence>
         {marginModalProduct && (
-          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div 
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="margin-modal-title"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setMarginModalProduct(null);
+            }}
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+          >
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -573,16 +617,18 @@ export default function AdminProducts() {
               
               <div className="flex justify-between items-start border-b-2 border-black dark:border-gray-700 pb-3">
                 <div className="space-y-0.5">
-                  <h3 className="text-lg font-black uppercase">Atur Margin Flat</h3>
+                  <h3 id="margin-modal-title" className="text-lg font-black uppercase">Atur Margin Flat</h3>
                   <p className="text-xs text-gray-500 font-bold truncate max-w-[280px]">
                     {marginModalProduct.name}
                   </p>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setMarginModalProduct(null)}
-                  className="p-1 rounded-lg border border-black dark:border-gray-700 bg-gray-100 dark:bg-gray-800"
+                  aria-label="Tutup dialog margin"
+                  className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl border-2 border-black dark:border-gray-700 bg-gray-100 dark:bg-gray-800 flex items-center justify-center cursor-pointer hover:bg-red-500 hover:text-white transition-colors focus-visible:ring-2 focus-visible:ring-brand-blue outline-none"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
@@ -608,7 +654,10 @@ export default function AdminProducts() {
 
                 {/* Input margin */}
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-black uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                  <label 
+                    htmlFor="flat-margin-input"
+                    className="block text-xs font-black uppercase tracking-wider text-gray-700 dark:text-gray-300 cursor-pointer"
+                  >
                     Besaran Margin Flat (Rupiah)
                   </label>
                   <div className="relative">
@@ -616,13 +665,14 @@ export default function AdminProducts() {
                       Rp
                     </span>
                     <input 
+                      id="flat-margin-input"
                       type="number"
                       min={0}
                       step="any"
                       value={flatMarginInput}
                       onChange={(e) => setFlatMarginInput(e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0))}
                       required
-                      className="w-full pl-11 pr-4 py-2.5 bg-white dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] text-base font-black font-mono rounded-xl focus:outline-none focus:border-brand-blue"
+                      className="w-full pl-11 pr-4 py-2.5 bg-white dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] text-base font-black font-mono rounded-xl focus:outline-none focus:border-brand-blue focus-visible:ring-2 focus-visible:ring-brand-blue"
                     />
                   </div>
                 </div>
@@ -636,7 +686,8 @@ export default function AdminProducts() {
                         key={amt}
                         type="button"
                         onClick={() => setFlatMarginInput(amt)}
-                        className="py-1 px-2 bg-gray-100 dark:bg-gray-800 border border-black dark:border-gray-700 rounded font-mono font-bold text-[11px] hover:bg-brand-yellow hover:text-black cursor-pointer"
+                        aria-label={`Pilih preset margin Rp ${amt.toLocaleString("id-ID")}`}
+                        className="py-1 px-2 bg-gray-100 dark:bg-gray-800 border border-black dark:border-gray-700 rounded font-mono font-bold text-[11px] hover:bg-brand-yellow hover:text-black cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-blue outline-none"
                       >
                         +{amt.toLocaleString()}
                       </button>
@@ -655,7 +706,7 @@ export default function AdminProducts() {
                   <button
                     type="submit"
                     disabled={savingMargin}
-                    className="flex-1 py-2.5 bg-brand-blue text-white font-black text-xs uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] neo-btn rounded-xl cursor-pointer disabled:opacity-50"
+                    className="flex-1 py-2.5 bg-brand-blue text-white font-black text-xs uppercase tracking-wider border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] neo-btn rounded-xl cursor-pointer disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-blue-400 outline-none"
                   >
                     {savingMargin ? "Menyimpan..." : "Simpan Margin"}
                   </button>
@@ -673,7 +724,15 @@ export default function AdminProducts() {
          ======================================================== */}
       <AnimatePresence>
         {editProduct && (
-          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div 
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-product-modal-title"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setEditProduct(null);
+            }}
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+          >
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -683,46 +742,66 @@ export default function AdminProducts() {
               
               <div className="flex justify-between items-start border-b-2 border-black dark:border-gray-700 pb-3">
                 <div>
-                  <h3 className="text-lg font-black uppercase">Sunting Detail Produk</h3>
+                  <h3 id="edit-product-modal-title" className="text-lg font-black uppercase">Sunting Detail Produk</h3>
                   <p className="text-xs text-gray-500">ID Layanan Premku: {editProduct.providerServiceId}</p>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setEditProduct(null)}
-                  className="p-1 rounded-lg border border-black dark:border-gray-700 bg-gray-100 dark:bg-gray-800"
+                  aria-label="Tutup dialog sunting produk"
+                  className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl border-2 border-black dark:border-gray-700 bg-gray-100 dark:bg-gray-800 flex items-center justify-center cursor-pointer hover:bg-red-500 hover:text-white transition-colors focus-visible:ring-2 focus-visible:ring-brand-blue outline-none"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
               <form onSubmit={handleSaveEdit} className="space-y-3.5">
                 <div className="space-y-1">
-                  <label className="text-xs font-black uppercase text-gray-700 dark:text-gray-300">Nama Produk</label>
+                  <label 
+                    htmlFor="edit-product-name"
+                    className="text-xs font-black uppercase text-gray-700 dark:text-gray-300 cursor-pointer"
+                  >
+                    Nama Produk
+                  </label>
                   <input 
+                    id="edit-product-name"
                     type="text"
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
                     required
-                    className="w-full px-3 py-2 bg-white dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] rounded-xl text-xs font-bold"
+                    className="w-full px-3 py-2 bg-white dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] rounded-xl text-xs font-bold focus:outline-none focus:border-brand-blue focus-visible:ring-2 focus-visible:ring-brand-blue"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-black uppercase text-gray-700 dark:text-gray-300">Deskripsi / Garansi</label>
+                  <label 
+                    htmlFor="edit-product-desc"
+                    className="text-xs font-black uppercase text-gray-700 dark:text-gray-300 cursor-pointer"
+                  >
+                    Deskripsi / Garansi
+                  </label>
                   <textarea 
+                    id="edit-product-desc"
                     value={editDesc}
                     onChange={(e) => setEditDesc(e.target.value)}
                     rows={3}
-                    className="w-full px-3 py-2 bg-white dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] rounded-xl text-xs font-medium"
+                    className="w-full px-3 py-2 bg-white dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] rounded-xl text-xs font-medium focus:outline-none focus:border-brand-blue focus-visible:ring-2 focus-visible:ring-brand-blue"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-black uppercase text-gray-700 dark:text-gray-300">Harga Coret / Asli (Rp)</label>
+                  <label 
+                    htmlFor="edit-product-orig-price"
+                    className="text-xs font-black uppercase text-gray-700 dark:text-gray-300 cursor-pointer"
+                  >
+                    Harga Coret / Asli (Rp)
+                  </label>
                   <input 
+                    id="edit-product-orig-price"
                     type="number"
                     value={editOriginalPrice}
                     onChange={(e) => setEditOriginalPrice(parseInt(e.target.value) || 0)}
-                    className="w-full px-3 py-2 bg-white dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] rounded-xl text-xs font-mono font-bold"
+                    className="w-full px-3 py-2 bg-white dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] rounded-xl text-xs font-mono font-bold focus:outline-none focus:border-brand-blue focus-visible:ring-2 focus-visible:ring-brand-blue"
                   />
                 </div>
 
@@ -737,7 +816,7 @@ export default function AdminProducts() {
                   <button
                     type="submit"
                     disabled={savingEdit}
-                    className="flex-1 py-2.5 bg-brand-blue text-white font-black text-xs uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] neo-btn rounded-xl cursor-pointer disabled:opacity-50"
+                    className="flex-1 py-2.5 bg-brand-blue text-white font-black text-xs uppercase tracking-wider border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] neo-btn rounded-xl cursor-pointer disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-blue-400 outline-none"
                   >
                     {savingEdit ? "Menyimpan..." : "Simpan Perubahan"}
                   </button>

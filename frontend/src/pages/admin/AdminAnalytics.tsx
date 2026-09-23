@@ -133,14 +133,16 @@ export default function AdminAnalytics() {
         <div className="flex flex-wrap items-center gap-3">
           {/* Month Selector Dropdown */}
           <div className="relative flex items-center">
-            <div className="absolute left-3 pointer-events-none text-black dark:text-gray-300">
+            <div className="absolute left-3 pointer-events-none text-black dark:text-gray-300" aria-hidden="true">
               <Calendar className="w-4 h-4" />
             </div>
             <select
+              id="analytics-month-select"
+              aria-label="Pilih periode laporan penjualan"
               value={selectedMonth}
               onChange={(e) => handleMonthChange(e.target.value)}
               disabled={loading}
-              className="pl-9 pr-8 py-2.5 bg-white dark:bg-[#1E2333] hover:bg-gray-50 dark:hover:bg-[#252c40] text-black dark:text-white font-black text-xs uppercase border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] rounded-xl cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-blue appearance-none transition-all disabled:opacity-60"
+              className="pl-9 pr-8 py-2.5 min-h-[44px] bg-white dark:bg-[#1E2333] hover:bg-gray-50 dark:hover:bg-[#252c40] text-black dark:text-white font-black text-xs uppercase border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] rounded-xl cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue appearance-none transition-all disabled:opacity-60"
             >
               {stats?.availableMonths?.map((m) => (
                 <option key={m.key} value={m.key}>
@@ -149,18 +151,20 @@ export default function AdminAnalytics() {
               ))}
               <option value="all">Semua Waktu (All-Time)</option>
             </select>
-            <div className="absolute right-3 pointer-events-none text-black dark:text-gray-300 font-black text-xs">
+            <div className="absolute right-3 pointer-events-none text-black dark:text-gray-300 font-black text-xs" aria-hidden="true">
               ▼
             </div>
           </div>
 
           {/* Refresh Button */}
           <button
+            type="button"
             onClick={() => fetchStats(selectedMonth)}
             disabled={loading}
-            className="px-4 py-2.5 bg-white dark:bg-[#1E2333] hover:bg-gray-100 dark:hover:bg-[#252c40] text-black dark:text-white font-black text-xs uppercase border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] neo-btn rounded-xl flex items-center gap-2 cursor-pointer transition-all disabled:opacity-60"
+            aria-label="Segarkan data analitik"
+            className="px-4 py-2.5 min-h-[44px] bg-white dark:bg-[#1E2333] hover:bg-gray-100 dark:hover:bg-[#252c40] text-black dark:text-white font-black text-xs uppercase border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] neo-btn rounded-xl flex items-center gap-2 cursor-pointer transition-all disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} aria-hidden="true" />
             <span>Refresh</span>
           </button>
         </div>
@@ -182,13 +186,13 @@ export default function AdminAnalytics() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse border border-black"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse border border-black" aria-hidden="true"></span>
             <h2 className="text-sm font-black uppercase tracking-wider text-black dark:text-white">
-              Performa Periode: <span className="text-brand-blue underline decoration-2 underline-offset-4">{stats?.selectedPeriod?.monthLabel || "Memuat..."}</span>
+              Performa Periode: <span className="text-brand-blue underline decoration-2 underline-offset-4">{stats?.selectedPeriod?.monthLabel || (loading ? "Memuat..." : "Periode")}</span>
             </h2>
           </div>
           <span className="text-xs font-bold text-gray-500 dark:text-gray-400">
-            {periodOrders} transaksi lunas
+            {loading && !stats ? "..." : `${periodOrders} transaksi lunas`}
           </span>
         </div>
 
@@ -201,12 +205,16 @@ export default function AdminAnalytics() {
                 PROFIT BERSIH (MARGIN)
               </span>
               <div className="w-8 h-8 rounded-lg bg-emerald-400 text-black border-2 border-black flex items-center justify-center shadow-[1px_1px_0px_#000]">
-                <Coins className="w-4 h-4 text-black" />
+                <Coins className="w-4 h-4 text-black" aria-hidden="true" />
               </div>
             </div>
-            <div className="text-2xl sm:text-3xl font-black text-emerald-900 dark:text-emerald-200 font-mono">
-              {stats ? formatRupiah(periodProfit) : "Rp 0"}
-            </div>
+            {loading && !stats ? (
+              <div className="h-8 w-32 bg-emerald-200 dark:bg-emerald-900/60 animate-pulse rounded my-1" />
+            ) : (
+              <div className="text-2xl sm:text-3xl font-black text-emerald-900 dark:text-emerald-200 font-mono">
+                {stats ? formatRupiah(periodProfit) : "Rp 0"}
+              </div>
+            )}
             <div className="flex items-center gap-1.5 pt-1">
               <span className="px-2 py-0.5 bg-emerald-300 dark:bg-emerald-700 text-emerald-950 dark:text-emerald-100 border border-black font-black text-[10px] rounded">
                 +{periodMarginPercentage}% Margin
@@ -224,12 +232,16 @@ export default function AdminAnalytics() {
                 OMZET PENJUALAN
               </span>
               <div className="w-8 h-8 rounded-lg bg-brand-blue text-white border-2 border-black flex items-center justify-center shadow-[1px_1px_0px_#000]">
-                <DollarSign className="w-4 h-4 text-white" />
+                <DollarSign className="w-4 h-4 text-white" aria-hidden="true" />
               </div>
             </div>
-            <div className="text-2xl sm:text-3xl font-black text-black dark:text-white font-mono">
-              {stats ? formatRupiah(periodRevenue) : "Rp 0"}
-            </div>
+            {loading && !stats ? (
+              <div className="h-8 w-32 bg-gray-200 dark:bg-gray-700 animate-pulse rounded my-1" />
+            ) : (
+              <div className="text-2xl sm:text-3xl font-black text-black dark:text-white font-mono">
+                {stats ? formatRupiah(periodRevenue) : "Rp 0"}
+              </div>
+            )}
             <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400">
               Total kotor pembayaran QRIS
             </p>
@@ -242,14 +254,18 @@ export default function AdminAnalytics() {
                 PESANAN SUKSES
               </span>
               <div className="w-8 h-8 rounded-lg bg-brand-yellow border-2 border-black flex items-center justify-center shadow-[1px_1px_0px_#000]">
-                <ShoppingBag className="w-4 h-4 text-black" />
+                <ShoppingBag className="w-4 h-4 text-black" aria-hidden="true" />
               </div>
             </div>
-            <div className="text-2xl sm:text-3xl font-black text-black dark:text-white font-mono">
-              {stats ? `${periodOrders}` : "0"} <span className="text-sm font-bold text-gray-500">Invoice</span>
-            </div>
+            {loading && !stats ? (
+              <div className="h-8 w-20 bg-gray-200 dark:bg-gray-700 animate-pulse rounded my-1" />
+            ) : (
+              <div className="text-2xl sm:text-3xl font-black text-black dark:text-white font-mono">
+                {stats ? `${periodOrders}` : "0"} <span className="text-sm font-bold text-gray-500">Invoice</span>
+              </div>
+            )}
             <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-              <CheckCircle2 className="w-3 h-3" />
+              <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
               <span>Status lunas & terkirim</span>
             </p>
           </div>
@@ -261,12 +277,16 @@ export default function AdminAnalytics() {
                 PROFIT / ORDER
               </span>
               <div className="w-8 h-8 rounded-lg bg-brand-pink text-white border-2 border-black flex items-center justify-center shadow-[1px_1px_0px_#000]">
-                <TrendingUp className="w-4 h-4 text-white" />
+                <TrendingUp className="w-4 h-4 text-white" aria-hidden="true" />
               </div>
             </div>
-            <div className="text-2xl sm:text-3xl font-black text-black dark:text-white font-mono">
-              {stats ? formatRupiah(avgProfitPerOrder) : "Rp 0"}
-            </div>
+            {loading && !stats ? (
+              <div className="h-8 w-28 bg-gray-200 dark:bg-gray-700 animate-pulse rounded my-1" />
+            ) : (
+              <div className="text-2xl sm:text-3xl font-black text-black dark:text-white font-mono">
+                {stats ? formatRupiah(avgProfitPerOrder) : "Rp 0"}
+              </div>
+            )}
             <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400">
               Rata-rata profit bersih tiap pesanan
             </p>
@@ -278,11 +298,11 @@ export default function AdminAnalytics() {
       {/* ========================================================
           SECTION 2: RINGKASAN MENYELURUH (ALL-TIME OVERVIEW)
          ======================================================== */}
-      <div className="bg-gradient-to-r from-gray-900 via-brand-dark to-gray-900 text-white border-2 border-black dark:border-gray-700 shadow-[6px_6px_0px_#000] p-6 rounded-2xl space-y-5">
+      <div className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 text-white border-2 border-black dark:border-gray-700 shadow-[6px_6px_0px_#000] p-6 rounded-2xl space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-700 pb-3">
           <div>
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-brand-pink text-white font-black text-[10px] uppercase tracking-wider rounded border border-white/20 mb-1">
-              <Sparkles className="w-3 h-3" />
+              <Sparkles className="w-3 h-3" aria-hidden="true" />
               <span>SEMUA WAKTU (ALL-TIME)</span>
             </div>
             <h2 className="text-lg font-black uppercase tracking-wide text-white">
@@ -300,9 +320,13 @@ export default function AdminAnalytics() {
             <span className="text-[10px] font-black uppercase text-gray-300 tracking-wider">
               TOTAL OMZET KESELURUHAN
             </span>
-            <div className="text-xl sm:text-2xl font-black text-white font-mono">
-              {stats ? formatRupiah(allTimeRevenue) : "Rp 0"}
-            </div>
+            {loading && !stats ? (
+              <div className="h-7 w-32 bg-white/20 animate-pulse rounded my-1" />
+            ) : (
+              <div className="text-xl sm:text-2xl font-black text-white font-mono">
+                {stats ? formatRupiah(allTimeRevenue) : "Rp 0"}
+              </div>
+            )}
             <p className="text-[11px] text-gray-400 font-medium">
               Total bruto penjualan seluruh transaksi
             </p>
@@ -318,9 +342,13 @@ export default function AdminAnalytics() {
                 NET PROFIT
               </span>
             </div>
-            <div className="text-xl sm:text-2xl font-black text-emerald-300 font-mono">
-              {stats ? formatRupiah(allTimeProfit) : "Rp 0"}
-            </div>
+            {loading && !stats ? (
+              <div className="h-7 w-32 bg-emerald-400/30 animate-pulse rounded my-1" />
+            ) : (
+              <div className="text-xl sm:text-2xl font-black text-emerald-300 font-mono">
+                {stats ? formatRupiah(allTimeProfit) : "Rp 0"}
+              </div>
+            )}
             <p className="text-[11px] text-emerald-400/90 font-medium">
               Total margin bersih keuntungan toko
             </p>
@@ -331,9 +359,13 @@ export default function AdminAnalytics() {
             <span className="text-[10px] font-black uppercase text-gray-300 tracking-wider">
               TOTAL TRANSAKSI BERHASIL
             </span>
-            <div className="text-xl sm:text-2xl font-black text-white font-mono">
-              {stats ? `${allTimeOrders}` : "0"} Pesanan
-            </div>
+            {loading && !stats ? (
+              <div className="h-7 w-20 bg-white/20 animate-pulse rounded my-1" />
+            ) : (
+              <div className="text-xl sm:text-2xl font-black text-white font-mono">
+                {stats ? `${allTimeOrders}` : "0"} Pesanan
+              </div>
+            )}
             <p className="text-[11px] text-gray-400 font-medium">
               Pesanan selesai terkirim ke pelanggan
             </p>
@@ -352,7 +384,7 @@ export default function AdminAnalytics() {
             <div className="space-y-0.5">
               <h2 className="text-lg font-black text-black dark:text-white uppercase tracking-wide flex items-center gap-2">
                 <span>Produk Terlaris & Profit Margin</span>
-                <Sparkles className="w-4 h-4 text-brand-pink fill-brand-pink" />
+                <Sparkles className="w-4 h-4 text-brand-pink fill-brand-pink" aria-hidden="true" />
               </h2>
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 Peringkat omzet dan laba bersih per produk pada periode {stats?.selectedPeriod?.monthLabel || ""}
@@ -361,7 +393,20 @@ export default function AdminAnalytics() {
           </div>
 
           <div className="space-y-3">
-            {stats && stats.topProducts && stats.topProducts.length > 0 ? (
+            {loading && !stats ? (
+              [1, 2, 3].map((i) => (
+                <div key={i} className="p-3.5 bg-gray-50 dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] rounded-xl flex items-center justify-between animate-pulse">
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 rounded-lg bg-gray-300 dark:bg-gray-700" />
+                    <div className="space-y-1.5">
+                      <div className="h-4 w-32 bg-gray-300 dark:bg-gray-700 rounded" />
+                      <div className="h-3 w-24 bg-gray-200 dark:bg-gray-800 rounded" />
+                    </div>
+                  </div>
+                  <div className="h-6 w-20 bg-gray-200 dark:bg-gray-800 rounded" />
+                </div>
+              ))
+            ) : stats && stats.topProducts && stats.topProducts.length > 0 ? (
               stats.topProducts.map((p, idx) => (
                 <div 
                   key={p.productId || idx}
@@ -395,7 +440,7 @@ export default function AdminAnalytics() {
               ))
             ) : (
               <div className="py-12 text-center text-gray-500 font-bold text-xs space-y-2">
-                <AlertCircle className="w-8 h-8 mx-auto text-gray-400" />
+                <AlertCircle className="w-8 h-8 mx-auto text-gray-400" aria-hidden="true" />
                 <p>Belum ada transaksi pesanan lunas pada periode {stats?.selectedPeriod?.monthLabel || ""}.</p>
                 <p className="text-[11px] text-gray-400">Data akan otomatis terisi saat pesanan baru selesai diproses.</p>
               </div>
@@ -460,28 +505,28 @@ export default function AdminAnalytics() {
             <div className="space-y-2 text-xs font-bold">
               <div className="flex justify-between py-1.5 border-b border-gray-100 dark:border-gray-800">
                 <span className="text-emerald-600 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" aria-hidden="true"></span>
                   Selesai (Completed):
                 </span>
                 <span className="font-mono">{stats?.statusCounts?.completed || 0}</span>
               </div>
               <div className="flex justify-between py-1.5 border-b border-gray-100 dark:border-gray-800">
                 <span className="text-blue-600 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                  <span className="w-2 h-2 rounded-full bg-blue-500" aria-hidden="true"></span>
                   Diproses (Processing):
                 </span>
                 <span className="font-mono">{stats?.statusCounts?.processing || 0}</span>
               </div>
               <div className="flex justify-between py-1.5 border-b border-gray-100 dark:border-gray-800">
                 <span className="text-brand-yellow flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-brand-yellow"></span>
+                  <span className="w-2 h-2 rounded-full bg-brand-yellow" aria-hidden="true"></span>
                   Lunas (Paid):
                 </span>
                 <span className="font-mono">{stats?.statusCounts?.paid || 0}</span>
               </div>
               <div className="flex justify-between py-1.5">
                 <span className="text-gray-500 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-gray-400"></span>
+                  <span className="w-2 h-2 rounded-full bg-gray-400" aria-hidden="true"></span>
                   Menunggu Pembayaran:
                 </span>
                 <span className="font-mono">{stats?.statusCounts?.waiting_payment || 0}</span>

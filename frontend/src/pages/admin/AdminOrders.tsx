@@ -305,6 +305,23 @@ export default function AdminOrders() {
   const [deliverySuccessMsg, setDeliverySuccessMsg] = useState<string | null>(null);
   const [copiedDeliveryKey, setCopiedDeliveryKey] = useState<string | null>(null);
   const [syncingProvider, setSyncingProvider] = useState(false);
+  const [actionToast, setActionToast] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const showToast = (type: "success" | "error", text: string) => {
+    setActionToast({ type, text });
+    setTimeout(() => setActionToast(null), 4000);
+  };
+
+  // Close modal on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && selectedOrder) {
+        closeDetail();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedOrder]);
 
   const handleCopyDelivery = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
@@ -323,11 +340,12 @@ export default function AdminOrders() {
       if (json.success && json.data) {
         setSelectedOrder(json.data);
         setOrders(prev => prev.map(o => o.id === json.data.id ? json.data : o));
+        showToast("success", "Status pesanan berhasil disinkronkan dengan provider supplier!");
       } else {
-        alert(json.message || "Gagal menyinkronkan status dengan supplier");
+        showToast("error", json.message || "Gagal menyinkronkan status dengan supplier");
       }
     } catch (err: any) {
-      alert(`Error sinkronisasi: ${err.message}`);
+      showToast("error", `Error sinkronisasi: ${err.message}`);
     } finally {
       setSyncingProvider(false);
     }
@@ -410,12 +428,12 @@ export default function AdminOrders() {
         // Update local list
         setOrders(prev => prev.map(o => o.id === selectedOrder.id ? { ...o, status: newStatus } : o));
         setSelectedOrder(prev => prev ? { ...prev, status: newStatus } : null);
-        alert("Status pesanan berhasil diperbarui!");
+        showToast("success", `Status pesanan #${selectedOrder.orderNumber} berhasil diperbarui!`);
       } else {
-        alert(`Gagal: ${json.message}`);
+        showToast("error", `Gagal mengubah status: ${json.message}`);
       }
     } catch (err: any) {
-      alert(`Error: ${err.message}`);
+      showToast("error", `Error pembaruan status: ${err.message}`);
     } finally {
       setUpdatingStatus(false);
     }
@@ -593,20 +611,42 @@ export default function AdminOrders() {
             <Search className="w-4 h-4 text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input 
               type="text"
+              aria-label="Cari nomor order, nomor WhatsApp, email, atau nama produk"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Cari nomor order (mis. ORD-...), nomor WA, email, atau nama produk..."
-              className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] text-sm font-medium rounded-xl focus:outline-none focus:border-brand-blue text-black dark:text-white"
+              className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] text-sm font-medium rounded-xl focus:outline-none focus:border-brand-blue focus-visible:ring-2 focus-visible:ring-brand-blue text-black dark:text-white"
             />
           </div>
           <button
             type="submit"
-            className="px-5 py-2.5 bg-brand-yellow text-black font-black text-xs uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] neo-btn rounded-xl cursor-pointer shrink-0"
+            className="px-5 py-2.5 bg-brand-yellow text-black font-black text-xs uppercase tracking-wider border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] neo-btn rounded-xl cursor-pointer shrink-0 focus-visible:ring-2 focus-visible:ring-brand-blue outline-none"
           >
             Cari
           </button>
         </form>
       </div>
+
+      {/* Action Toast Feedback Banner */}
+      {actionToast && (
+        <motion.div 
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0 }}
+          className={`p-3.5 rounded-xl border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] flex items-center gap-2.5 text-xs font-black ${
+            actionToast.type === "success"
+              ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200"
+              : "bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-200"
+          }`}
+        >
+          {actionToast.type === "success" ? (
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          ) : (
+            <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+          )}
+          <span>{actionToast.text}</span>
+        </motion.div>
+      )}
 
       {/* ========================================================
           ORDERS CONTAINER (Desktop Table + Mobile Cards)
@@ -618,13 +658,13 @@ export default function AdminOrders() {
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="border-b-2 border-black dark:border-gray-700 bg-gray-50 dark:bg-[#12141C] text-gray-600 dark:text-gray-300 font-black uppercase text-[11px]">
-                <th className="py-3.5 px-4">Nomor Order</th>
-                <th className="py-3.5 px-4">Kontak Pelanggan</th>
-                <th className="py-3.5 px-4">Produk</th>
-                <th className="py-3.5 px-4">Total</th>
-                <th className="py-3.5 px-4">Status</th>
-                <th className="py-3.5 px-4">Waktu</th>
-                <th className="py-3.5 px-4 text-right">Aksi</th>
+                <th scope="col" className="py-3.5 px-4">Nomor Order</th>
+                <th scope="col" className="py-3.5 px-4">Kontak Pelanggan</th>
+                <th scope="col" className="py-3.5 px-4">Produk</th>
+                <th scope="col" className="py-3.5 px-4">Total</th>
+                <th scope="col" className="py-3.5 px-4">Status</th>
+                <th scope="col" className="py-3.5 px-4">Waktu</th>
+                <th scope="col" className="py-3.5 px-4 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y-2 divide-gray-200 dark:divide-gray-800 font-medium">
@@ -705,8 +745,10 @@ export default function AdminOrders() {
                     </td>
                     <td className="py-3.5 px-4 text-right whitespace-nowrap">
                       <button
+                        type="button"
                         onClick={() => openDetail(order)}
-                        className="px-3 py-1.5 bg-brand-yellow text-black font-extrabold text-xs uppercase border-2 border-black shadow-[2px_2px_0px_#000] neo-btn rounded-lg cursor-pointer"
+                        aria-label={`Buka detail pesanan ${order.orderNumber}`}
+                        className="px-3 py-1.5 bg-brand-yellow text-black font-extrabold text-xs uppercase border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] neo-btn rounded-lg cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-blue outline-none"
                       >
                         Buka Detail
                       </button>
@@ -841,8 +883,10 @@ export default function AdminOrders() {
 
               {/* Action Button */}
               <button
+                type="button"
                 onClick={() => openDetail(order)}
-                className="w-full py-2.5 bg-brand-yellow text-black font-black text-xs uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] neo-btn rounded-xl flex items-center justify-center gap-2 cursor-pointer"
+                aria-label={`Buka detail pesanan ${order.orderNumber}`}
+                className="w-full py-2.5 bg-brand-yellow text-black font-black text-xs uppercase tracking-wider border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] neo-btn rounded-xl flex items-center justify-center gap-2 cursor-pointer min-h-[44px] focus-visible:ring-2 focus-visible:ring-brand-blue outline-none"
               >
                 <span>Buka Detail Pesanan</span>
               </button>
@@ -861,12 +905,20 @@ export default function AdminOrders() {
          ======================================================== */}
       <AnimatePresence>
         {selectedOrder && (
-          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div 
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="order-detail-modal-title"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) closeDetail();
+            }}
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
+          >
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-[#181C2A] border-2 border-black dark:border-gray-700 shadow-[8px_8px_0px_0px_#000000] rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-6 text-black dark:text-white"
+              className="bg-white dark:bg-[#181C2A] border-2 border-black dark:border-gray-700 shadow-[8px_8px_0px_0px_#000000] rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-5 sm:p-6 space-y-6 text-black dark:text-white"
             >
               
               {/* Modal Header */}
@@ -874,7 +926,7 @@ export default function AdminOrders() {
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <Receipt className="w-5 h-5 text-brand-blue" />
-                    <h2 className="text-xl font-black tracking-tight uppercase">
+                    <h2 id="order-detail-modal-title" className="text-xl font-black tracking-tight uppercase">
                       Detail Pesanan
                     </h2>
                   </div>
@@ -884,10 +936,12 @@ export default function AdminOrders() {
                 </div>
 
                 <button
+                  type="button"
                   onClick={closeDetail}
-                  className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 border-2 border-black dark:border-gray-700 flex items-center justify-center shadow-[1px_1px_0px_#000] cursor-pointer hover:bg-red-500 hover:text-white"
+                  aria-label="Tutup detail pesanan"
+                  className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-gray-100 dark:bg-gray-800 border-2 border-black dark:border-gray-700 flex items-center justify-center shadow-[1px_1px_0px_#000] cursor-pointer hover:bg-red-500 hover:text-white transition-colors focus-visible:ring-2 focus-visible:ring-brand-blue outline-none"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 

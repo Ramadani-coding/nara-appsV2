@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Lock, Mail, Eye, EyeOff, ShieldAlert, ArrowRight, Loader2, ShieldCheck } from "lucide-react";
 import { useAdminAuth } from "../../context/AdminAuthContext";
@@ -124,12 +124,16 @@ export default function AdminLogin() {
             
             {/* Email Field */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-black uppercase text-gray-800 dark:text-gray-200 tracking-wider">
+              <label 
+                htmlFor="admin-login-email" 
+                className="block text-xs font-black uppercase text-gray-800 dark:text-gray-200 tracking-wider cursor-pointer"
+              >
                 Email Administrator
               </label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input 
+                  id="admin-login-email"
                   type="email"
                   value={email}
                   disabled={submitting}
@@ -137,19 +141,23 @@ export default function AdminLogin() {
                   placeholder="Masukkan email admin..."
                   required
                   autoComplete="username"
-                  className="w-full pl-10 pr-3.5 py-2.5 bg-white dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] text-black dark:text-white font-medium text-sm rounded-xl focus:outline-none focus:border-brand-blue disabled:opacity-50"
+                  className="w-full pl-10 pr-3.5 py-2.5 bg-white dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] text-black dark:text-white font-medium text-sm rounded-xl focus:outline-none focus:border-brand-blue focus-visible:ring-2 focus-visible:ring-brand-blue disabled:opacity-50"
                 />
               </div>
             </div>
 
             {/* Password Field */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-black uppercase text-gray-800 dark:text-gray-200 tracking-wider">
+              <label 
+                htmlFor="admin-login-password" 
+                className="block text-xs font-black uppercase text-gray-800 dark:text-gray-200 tracking-wider cursor-pointer"
+              >
                 Kata Sandi
               </label>
               <div className="relative">
                 <Lock className="w-4 h-4 text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input 
+                  id="admin-login-password"
                   type={showPassword ? "text" : "password"}
                   value={password}
                   disabled={submitting}
@@ -157,14 +165,15 @@ export default function AdminLogin() {
                   placeholder="••••••••••••"
                   required
                   autoComplete="current-password"
-                  className="w-full pl-10 pr-10 py-2.5 bg-white dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] text-black dark:text-white font-medium text-sm rounded-xl focus:outline-none focus:border-brand-blue disabled:opacity-50"
+                  className="w-full pl-10 pr-10 py-2.5 bg-white dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] text-black dark:text-white font-medium text-sm rounded-xl focus:outline-none focus:border-brand-blue focus-visible:ring-2 focus-visible:ring-brand-blue disabled:opacity-50"
                 />
                 <button
                   type="button"
-                  tabIndex={-1}
                   disabled={submitting}
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-black dark:hover:text-white p-1 cursor-pointer"
+                  aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
+                  title={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-black dark:hover:text-white p-1.5 cursor-pointer rounded focus-visible:ring-2 focus-visible:ring-brand-blue outline-none"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -175,7 +184,7 @@ export default function AdminLogin() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full mt-2 py-3 bg-brand-blue hover:bg-blue-700 text-white font-black text-sm uppercase tracking-wider border-2 border-black shadow-[4px_4px_0px_#000] neo-btn rounded-xl flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              className="w-full mt-2 py-3 bg-brand-blue hover:bg-blue-700 text-white font-black text-sm uppercase tracking-wider border-2 border-black dark:border-gray-700 shadow-[4px_4px_0px_#000] neo-btn rounded-xl flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-blue-400 outline-none"
             >
               {submitting ? (
                 <>
@@ -195,12 +204,12 @@ export default function AdminLogin() {
 
         {/* Back to store link */}
         <div className="text-center">
-          <a
-            href="/"
-            className="text-xs font-black uppercase tracking-wider text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white underline underline-offset-4"
+          <Link
+            to="/"
+            className="text-xs font-black uppercase tracking-wider text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-brand-blue rounded outline-none"
           >
             ← Kembali ke Katalog Nara Store
-          </a>
+          </Link>
         </div>
 
       </motion.div>
