@@ -13,6 +13,7 @@ import { eq, desc, sql, and, like, or, inArray } from "drizzle-orm";
 import { syncService } from "../services/sync.service.js";
 import { premiumkuService } from "../services/premiumku.service.js";
 import { orderService } from "../services/order.service.js";
+import { financialReportService } from "../services/financialReport.service.js";
 import { adminAuthMiddleware, type AuthenticatedAdminRequest } from "../middleware/adminAuth.js";
 import { adminAuthLimiter } from "../middleware/rateLimiter.js";
 
@@ -119,6 +120,16 @@ router.get("/stats", async (req: Request, res: Response) => {
       totalProfit: number;
     }>();
 
+    // Akumulasi data historis per bulan
+    const monthlyStatsMap = new Map<string, {
+      monthKey: string;
+      monthLabel: string;
+      revenue: number;
+      profit: number;
+      orders: number;
+      marginPercentage: number;
+    }>();
+
     for (const order of allOrders) {
       const st = order.status || "waiting_payment";
       statusCounts[st] = (statusCounts[st] || 0) + 1;
@@ -144,6 +155,20 @@ router.get("/stats", async (req: Request, res: Response) => {
           }
         }
         allTimeProfit += orderProfit;
+
+        // Akumulasi bulanan
+        const mStats = monthlyStatsMap.get(orderMonthKey) || {
+          monthKey: orderMonthKey,
+          monthLabel: formatMonthKeyLabel(orderMonthKey),
+          revenue: 0,
+          profit: 0,
+          orders: 0,
+          marginPercentage: 0,
+        };
+        mStats.revenue += orderAmount;
+        mStats.profit += orderProfit;
+        mStats.orders += 1;
+        monthlyStatsMap.set(orderMonthKey, mStats);
 
         // Cek filter periode
         const matchesPeriod = selectedMonth === "all" || orderMonthKey === selectedMonth;
@@ -174,6 +199,18 @@ router.get("/stats", async (req: Request, res: Response) => {
       }
     }
 
+    // Pastikan bulan berjalan tercatat di map bulanan
+    if (!monthlyStatsMap.has(currentMonthKey)) {
+      monthlyStatsMap.set(currentMonthKey, {
+        monthKey: currentMonthKey,
+        monthLabel: formatMonthKeyLabel(currentMonthKey),
+        revenue: 0,
+        profit: 0,
+        orders: 0,
+        marginPercentage: 0,
+      });
+    }
+
     // Urutkan daftar bulan secara descending (terbaru di atas)
     const sortedMonthKeys = Array.from(monthKeysSet).sort((a, b) => b.localeCompare(a));
     const availableMonths = sortedMonthKeys.map((key) => ({
@@ -181,6 +218,41 @@ router.get("/stats", async (req: Request, res: Response) => {
       label: formatMonthKeyLabel(key),
       isCurrent: key === currentMonthKey,
     }));
+
+    const sortedMonthlyStats = Array.from(monthlyStatsMap.values()).map(m => ({
+      ...m,
+      marginPercentage: m.revenue > 0 ? Math.round((m.profit / m.revenue) * 100) : 0,
+    })).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+
+    // Kalkulasi Rata-rata Penjualan dalam 1 Bulan
+    const totalRecordedMonths = Math.max(1, sortedMonthlyStats.length);
+    const avgMonthlyRevenue = Math.round(allTimeRevenue / totalRecordedMonths);
+    const avgMonthlyProfit = Math.round(allTimeProfit / totalRecordedMonths);
+    const avgMonthlyOrders = Math.round(allTimePaidOrdersCount / totalRecordedMonths);
+    const avgMonthlyMargin = avgMonthlyRevenue > 0 ? Math.round((avgMonthlyProfit / avgMonthlyRevenue) * 100) : 0;
+
+    // Kalkulasi Rata-rata Harian pada periode berjalan
+    let daysElapsed = 30;
+    if (selectedMonth === "all") {
+      daysElapsed = totalRecordedMonths * 30;
+    } else {
+      const parts = selectedMonth.split("-");
+      if (parts.length === 2) {
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        const daysInMonth = new Date(y, m, 0).getDate();
+        if (selectedMonth === currentMonthKey) {
+          daysElapsed = Math.min(daysInMonth, now.getDate());
+        } else {
+          daysElapsed = daysInMonth;
+        }
+      }
+    }
+    daysElapsed = Math.max(1, daysElapsed);
+
+    const dailyAvgRevenue = Math.round(periodRevenue / daysElapsed);
+    const dailyAvgProfit = Math.round(periodProfit / daysElapsed);
+    const dailyAvgOrders = Number((periodPaidOrdersCount / daysElapsed).toFixed(1));
 
     // Top Selling Products periode terpilih (maks 10 produk)
     const topProducts = Array.from(periodProductSalesMap.values())
@@ -243,6 +315,19 @@ router.get("/stats", async (req: Request, res: Response) => {
           orders: periodPaidOrdersCount,
           marginPercentage: periodMarginPercentage,
         },
+        // Rata-rata Penjualan dalam 1 Bulan & Harian:
+        monthlyAverage: {
+          totalMonths: totalRecordedMonths,
+          revenue: avgMonthlyRevenue,
+          profit: avgMonthlyProfit,
+          orders: avgMonthlyOrders,
+          marginPercentage: avgMonthlyMargin,
+          dailyAvgRevenue,
+          dailyAvgProfit,
+          dailyAvgOrders,
+          daysElapsed,
+        },
+        monthlyBreakdown: sortedMonthlyStats,
         availableMonths,
       },
     });
@@ -251,6 +336,32 @@ router.get("/stats", async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: "Gagal mengambil statistik dashboard",
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/admin/reports/financial/export
+ * Menghasilkan dan mendownload file Excel (.xlsx) resmi LAPORAN KEUANGAN & PROFIT MARGIN
+ * Mendukung filter bulanan (?month=YYYY-MM atau ?month=all)
+ */
+router.get("/reports/financial/export", async (req: Request, res: Response) => {
+  try {
+    const requestedMonth = typeof req.query.month === "string" ? req.query.month : undefined;
+    const { buffer, filename } = await financialReportService.generateFinancialReportExcel(requestedMonth);
+
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Length", buffer.length);
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+
+    return res.status(200).send(buffer);
+  } catch (error: any) {
+    console.error("Error exporting financial report Excel:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Gagal menghasilkan file Excel Laporan Keuangan",
       error: error.message,
     });
   }

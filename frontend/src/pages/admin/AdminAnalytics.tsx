@@ -8,7 +8,9 @@ import {
   Calendar,
   Coins,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  FileSpreadsheet,
+  Download
 } from "lucide-react";
 import { adminFetch } from "../../lib/api";
 
@@ -42,6 +44,27 @@ interface TopProduct {
   totalProfit: number;
 }
 
+interface MonthlyAverageMetrics {
+  totalMonths: number;
+  revenue: number;
+  profit: number;
+  orders: number;
+  marginPercentage: number;
+  dailyAvgRevenue?: number;
+  dailyAvgProfit?: number;
+  dailyAvgOrders?: number;
+  daysElapsed?: number;
+}
+
+interface MonthlyBreakdownItem {
+  monthKey: string;
+  monthLabel: string;
+  revenue: number;
+  profit: number;
+  orders: number;
+  marginPercentage: number;
+}
+
 interface StatsData {
   totalRevenue: number;
   totalOrders: number;
@@ -55,12 +78,16 @@ interface StatsData {
   allTime: AllTimeMetrics;
   selectedPeriod: PeriodMetrics;
   availableMonths: AvailableMonth[];
+  monthlyAverage?: MonthlyAverageMetrics;
+  monthlyBreakdown?: MonthlyBreakdownItem[];
 }
 
 export default function AdminAnalytics() {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState<string>("");
+  const [exporting, setExporting] = useState(false);
+  const [exportFeedback, setExportFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const fetchStats = async (monthKey?: string) => {
     setLoading(true);
@@ -99,6 +126,59 @@ export default function AdminAnalytics() {
       currency: "IDR",
       maximumFractionDigits: 0,
     }).format(num);
+  };
+
+  const handleExportExcel = async () => {
+    if (exporting) return;
+    setExporting(true);
+    setExportFeedback(null);
+
+    try {
+      const queryParam = selectedMonth ? `?month=${encodeURIComponent(selectedMonth)}` : "";
+      const res = await adminFetch(`/admin/reports/financial/export${queryParam}`);
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => null);
+        throw new Error(errJson?.message || "Gagal mengunduh file laporan Excel");
+      }
+
+      const disposition = res.headers.get("Content-Disposition");
+      let filename = `Laporan_Keuangan_NaraStore_${selectedMonth || "all"}.xlsx`;
+      if (disposition && disposition.includes("filename=")) {
+        const match = disposition.match(/filename="?([^"]+)"?/);
+        if (match && match[1]) {
+          filename = match[1];
+        }
+      }
+
+      const blob = await res.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      window.URL.revokeObjectURL(downloadUrl);
+      link.remove();
+
+      const periodLabel = stats?.selectedPeriod?.monthLabel || (selectedMonth === "all" ? "Semua Waktu" : selectedMonth);
+      setExportFeedback({
+        type: "success",
+        message: `File Excel "${filename}" (${periodLabel}) berhasil diunduh! Berisi 3 Sheet: Ringkasan Eksekutif, Analisis Profit Produk, dan Jurnal Transaksi.`,
+      });
+
+      setTimeout(() => {
+        setExportFeedback(null);
+      }, 7000);
+    } catch (err: any) {
+      console.error("Gagal mengunduh laporan Excel:", err);
+      setExportFeedback({
+        type: "error",
+        message: err.message || "Gagal memproses file Excel laporan keuangan.",
+      });
+    } finally {
+      setExporting(false);
+    }
   };
 
   const periodProfit = stats?.selectedPeriod?.profit ?? 0;
@@ -156,6 +236,23 @@ export default function AdminAnalytics() {
             </div>
           </div>
 
+          {/* Export Excel Button */}
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            disabled={exporting || loading}
+            aria-label="Export data laporan keuangan dan profit margin ke Excel"
+            className="px-4 py-2.5 min-h-[44px] bg-emerald-500 hover:bg-emerald-400 text-white font-black text-xs uppercase border-2 border-black shadow-[3px_3px_0px_#000] neo-btn rounded-xl flex items-center gap-2 cursor-pointer transition-all disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0px_#000]"
+            title="Download file Excel (.xlsx) dengan 3 sheet rapi dan berformat angka"
+          >
+            {exporting ? (
+              <RefreshCw className="w-3.5 h-3.5 animate-spin text-white" aria-hidden="true" />
+            ) : (
+              <FileSpreadsheet className="w-4 h-4 text-white" aria-hidden="true" />
+            )}
+            <span>{exporting ? "Membuat Excel..." : "Export Excel"}</span>
+          </button>
+
           {/* Refresh Button */}
           <button
             type="button"
@@ -169,6 +266,35 @@ export default function AdminAnalytics() {
           </button>
         </div>
       </div>
+
+      {/* Export Feedback Banner */}
+      {exportFeedback && (
+        <div 
+          className={`p-3.5 border-2 border-black rounded-xl shadow-[3px_3px_0px_#000] flex items-center justify-between gap-3 text-xs font-bold transition-all ${
+            exportFeedback.type === "success" 
+              ? "bg-emerald-50 dark:bg-[#122b1f] text-emerald-950 dark:text-emerald-200 border-black" 
+              : "bg-red-50 dark:bg-[#2b1212] text-red-950 dark:text-red-200 border-black"
+          }`}
+          role="status"
+        >
+          <div className="flex items-center gap-2.5">
+            {exportFeedback.type === "success" ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" aria-hidden="true" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" aria-hidden="true" />
+            )}
+            <span>{exportFeedback.message}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setExportFeedback(null)}
+            className="text-gray-500 hover:text-black dark:text-gray-400 dark:hover:text-white font-black text-xs px-2 py-1 cursor-pointer"
+            aria-label="Tutup notifikasi"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Auto Reset Notice Banner */}
       <div className="p-3 bg-brand-yellow/15 border-2 border-black dark:border-brand-yellow/30 rounded-xl shadow-[2px_2px_0px_#000] flex items-center gap-2 text-xs font-bold text-black dark:text-gray-200">
@@ -296,6 +422,113 @@ export default function AdminAnalytics() {
       </div>
 
       {/* ========================================================
+          SECTION: RATA-RATA PENJUALAN DALAM 1 BULAN (AVERAGE SALES)
+         ======================================================== */}
+      <div className="bg-white dark:bg-[#181C2A] border-2 border-black dark:border-gray-700 shadow-[6px_6px_0px_#000] p-6 rounded-2xl space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b-2 border-black dark:border-gray-700 pb-3">
+          <div>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-brand-yellow text-black font-black text-[10px] uppercase tracking-wider rounded border border-black mb-1">
+              <Calendar className="w-3 h-3" aria-hidden="true" />
+              <span>BENCHMARK PENJUALAN TOKO</span>
+            </div>
+            <h2 className="text-lg font-black uppercase tracking-wide text-black dark:text-white flex items-center gap-2">
+              <span>Rata-Rata Penjualan dalam 1 Bulan</span>
+            </h2>
+          </div>
+          <p className="text-xs font-bold text-gray-500 dark:text-gray-400">
+            Dihitung dari riwayat {stats?.monthlyAverage?.totalMonths || 1} bulan operasional toko
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          
+          {/* Card 1: Rata-Rata Omzet / Bulan */}
+          <div className="p-4 bg-blue-50/70 dark:bg-blue-950/20 border-2 border-black dark:border-blue-500/40 rounded-xl space-y-1">
+            <span className="text-[10px] font-black uppercase text-blue-800 dark:text-blue-300 tracking-wider">
+              RATA-RATA OMZET / BULAN
+            </span>
+            <div className="text-xl sm:text-2xl font-black text-black dark:text-white font-mono">
+              {stats?.monthlyAverage ? formatRupiah(stats.monthlyAverage.revenue) : "Rp 0"}
+            </div>
+            <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400">
+              Standar penjualan bruto per bulan
+            </p>
+          </div>
+
+          {/* Card 2: Rata-Rata Profit Bersih / Bulan */}
+          <div className="p-4 bg-emerald-50/70 dark:bg-emerald-950/20 border-2 border-black dark:border-emerald-500/40 rounded-xl space-y-1">
+            <div className="flex justify-between items-center">
+              <span className="text-[10px] font-black uppercase text-emerald-800 dark:text-emerald-300 tracking-wider">
+                RATA-RATA PROFIT / BULAN
+              </span>
+              <span className="px-1.5 py-0.5 bg-emerald-300 dark:bg-emerald-800 text-emerald-950 dark:text-emerald-100 font-black text-[9px] rounded">
+                +{stats?.monthlyAverage?.marginPercentage || 0}%
+              </span>
+            </div>
+            <div className="text-xl sm:text-2xl font-black text-emerald-700 dark:text-emerald-300 font-mono">
+              {stats?.monthlyAverage ? formatRupiah(stats.monthlyAverage.profit) : "Rp 0"}
+            </div>
+            <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
+              Laba bersih murni rata-rata tiap bulan
+            </p>
+          </div>
+
+          {/* Card 3: Rata-Rata Pesanan / Bulan */}
+          <div className="p-4 bg-amber-50/70 dark:bg-amber-950/20 border-2 border-black dark:border-amber-500/40 rounded-xl space-y-1">
+            <span className="text-[10px] font-black uppercase text-amber-800 dark:text-amber-300 tracking-wider">
+              RATA-RATA PESANAN / BULAN
+            </span>
+            <div className="text-xl sm:text-2xl font-black text-black dark:text-white font-mono">
+              {stats?.monthlyAverage?.orders || 0} <span className="text-xs font-bold text-gray-500">Order/Bln</span>
+            </div>
+            <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400">
+              Frekuensi pesanan sukses bulanan
+            </p>
+          </div>
+
+          {/* Card 4: Rata-Rata Penjualan Harian */}
+          <div className="p-4 bg-purple-50/70 dark:bg-purple-950/20 border-2 border-black dark:border-purple-500/40 rounded-xl space-y-1">
+            <span className="text-[10px] font-black uppercase text-purple-800 dark:text-purple-300 tracking-wider">
+              RATA-RATA OMZET / HARI
+            </span>
+            <div className="text-xl sm:text-2xl font-black text-purple-900 dark:text-purple-200 font-mono">
+              {stats?.monthlyAverage?.dailyAvgRevenue ? formatRupiah(stats.monthlyAverage.dailyAvgRevenue) : "Rp 0"}
+            </div>
+            <p className="text-[11px] font-bold text-purple-700 dark:text-purple-400">
+              Profit harian: ~{stats?.monthlyAverage?.dailyAvgProfit ? formatRupiah(stats.monthlyAverage.dailyAvgProfit) : "Rp 0"} / hari
+            </p>
+          </div>
+
+        </div>
+
+        {/* Historis Bulanan Ringkas jika ada data bulanan */}
+        {stats?.monthlyBreakdown && stats.monthlyBreakdown.length > 0 && (
+          <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+            <div className="text-xs font-black text-black dark:text-white uppercase mb-2 flex items-center gap-1.5">
+              <span>Riwayat Performa Antar Bulan</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
+              {stats.monthlyBreakdown.map((m) => (
+                <div 
+                  key={m.monthKey}
+                  className="p-2.5 bg-gray-50 dark:bg-[#12141C] border border-black/30 dark:border-gray-700 rounded-lg flex items-center justify-between text-xs font-bold"
+                >
+                  <div>
+                    <div className="text-black dark:text-white">{m.monthLabel}</div>
+                    <div className="text-[10px] text-gray-500">{m.orders} transaksi ({m.marginPercentage}% margin)</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-mono text-emerald-600 dark:text-emerald-400">+{formatRupiah(m.profit)}</div>
+                    <div className="text-[10px] text-gray-400">{formatRupiah(m.revenue)}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ========================================================
           SECTION 2: RINGKASAN MENYELURUH (ALL-TIME OVERVIEW)
          ======================================================== */}
       <div className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 text-white border-2 border-black dark:border-gray-700 shadow-[6px_6px_0px_#000] p-6 rounded-2xl space-y-5">
@@ -380,7 +613,7 @@ export default function AdminAnalytics() {
         
         {/* Left 7 Cols: Top Selling Products with Profit */}
         <div className="lg:col-span-7 bg-white dark:bg-[#181C2A] border-2 border-black dark:border-gray-700 shadow-[6px_6px_0px_0px_#000000] p-6 rounded-2xl space-y-4">
-          <div className="flex items-center justify-between border-b-2 border-black dark:border-gray-700 pb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b-2 border-black dark:border-gray-700 pb-3 gap-3">
             <div className="space-y-0.5">
               <h2 className="text-lg font-black text-black dark:text-white uppercase tracking-wide flex items-center gap-2">
                 <span>Produk Terlaris & Profit Margin</span>
@@ -390,6 +623,16 @@ export default function AdminAnalytics() {
                 Peringkat omzet dan laba bersih per produk pada periode {stats?.selectedPeriod?.monthLabel || ""}
               </p>
             </div>
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              disabled={exporting || loading}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 border border-emerald-600/40 rounded-lg text-xs font-bold transition-all disabled:opacity-50 cursor-pointer self-start sm:self-auto shrink-0 shadow-[1px_1px_0px_#000]"
+              title="Ekspor seluruh analisis profit produk ke format Excel"
+            >
+              <Download className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Unduh Excel</span>
+            </button>
           </div>
 
           <div className="space-y-3">
