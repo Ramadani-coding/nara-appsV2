@@ -8,8 +8,12 @@ import type { Request, Response, NextFunction } from "express";
 export function isWhitelistedRequest(req: Request): boolean {
   const path = req.originalUrl || req.url || "";
 
-  // 1. Webhook resmi Midtrans
-  if (path.includes("/payments/notification") || path.includes("/payments/webhook")) {
+  // 1. Webhook resmi Midtrans & WhatsApp Gateway (GoWA)
+  if (
+    path.includes("/payments/notification") ||
+    path.includes("/payments/webhook") ||
+    path.includes("/webhook")
+  ) {
     return true;
   }
 

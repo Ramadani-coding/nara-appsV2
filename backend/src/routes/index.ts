@@ -6,6 +6,7 @@ import adminRoutes from "./admin.routes.js";
 import orderRoutes from "./order.routes.js";
 import paymentRoutes from "./payment.routes.js";
 import botRoutes from "./bot.routes.js";
+import webhookRoutes from "./webhook.routes.js";
 
 const apiRouter = Router();
 
@@ -24,5 +25,6 @@ apiRouter.use("/admin", adminRoutes);
 apiRouter.use("/orders", orderRoutes);
 apiRouter.use("/payments", paymentRoutes);
 apiRouter.use("/bot", botRoutes);
+apiRouter.use("/webhook", webhookRoutes);
 
 export default apiRouter;

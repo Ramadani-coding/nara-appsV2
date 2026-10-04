@@ -19,7 +19,8 @@
     "db:clear-transactions": "tsx src/scripts/clear-transactions.ts",
     "test:gowa": "tsx src/scripts/test-gowa.ts",
     "test:bot": "tsx src/scripts/test-bot-flow.ts",
-    "test:rate-limit": "tsx src/scripts/test-rate-limit.ts"
+    "test:rate-limit": "tsx src/scripts/test-rate-limit.ts",
+    "test:webhook": "tsx src/scripts/test-webhook-whatsapp.ts"
   },
   "dependencies": {
     "bullmq": "^6.3.11",
