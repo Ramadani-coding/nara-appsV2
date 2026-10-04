@@ -101,11 +101,11 @@ export const AdminLayout: React.FC = () => {
       {/* ========================================================
           SIDEBAR DESKTOP
          ======================================================== */}
-      <aside className="hidden md:flex flex-col w-64 lg:w-72 bg-white dark:bg-[#151821] border-r-2 border-black dark:border-gray-700 min-h-screen p-5 shrink-0 justify-between">
-        <div className="space-y-6">
+      <aside className="hidden md:flex flex-col w-64 lg:w-72 bg-white dark:bg-[#151821] border-r-2 border-black dark:border-gray-700 h-screen sticky top-0 p-5 shrink-0 justify-between z-20">
+        <div className="flex flex-col flex-1 min-h-0 overflow-y-auto space-y-6 pr-0.5">
           
           {/* Logo & Brand */}
-          <div className="flex items-center gap-3 pb-4 border-b-2 border-black dark:border-gray-700">
+          <div className="flex items-center gap-3 pb-4 border-b-2 border-black dark:border-gray-700 shrink-0">
             <Link to="/admin" className="flex items-center gap-2.5 focus-visible:ring-2 focus-visible:ring-brand-blue rounded-xl outline-none">
               <img 
                 src="/nara-logov2.png" 
@@ -129,7 +129,7 @@ export const AdminLayout: React.FC = () => {
             to="/admin/profile"
             title="Kelola Profil & Kata Sandi"
             aria-label="Kelola Profil dan Kata Sandi Administrator"
-            className="p-3 bg-brand-yellow/30 dark:bg-amber-950/40 hover:bg-brand-yellow/50 border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer block focus-visible:ring-2 focus-visible:ring-brand-blue outline-none"
+            className="p-3 bg-brand-yellow/30 dark:bg-amber-950/40 hover:bg-brand-yellow/50 border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer block focus-visible:ring-2 focus-visible:ring-brand-blue outline-none shrink-0"
           >
             <div className="w-8 h-8 rounded-lg bg-brand-yellow border-2 border-black flex items-center justify-center shrink-0 shadow-[1px_1px_0px_#000]">
               <ShieldCheck className="w-4 h-4 text-black" />
@@ -143,7 +143,7 @@ export const AdminLayout: React.FC = () => {
           </Link>
 
           {/* Navigation Links */}
-          <nav className="space-y-2" aria-label="Menu Utama Admin">
+          <nav className="space-y-2 flex-1" aria-label="Menu Utama Admin">
             <div className="text-[11px] font-black uppercase text-gray-500 dark:text-gray-400 px-1 tracking-wider">
               MENU UTAMA
             </div>
@@ -169,7 +169,7 @@ export const AdminLayout: React.FC = () => {
         </div>
 
         {/* Bottom Actions */}
-        <div className="pt-6 border-t-2 border-black dark:border-gray-700 space-y-2.5">
+        <div className="pt-4 border-t-2 border-black dark:border-gray-700 space-y-2.5 shrink-0 mt-4">
           <Link
             to="/"
             target="_blank"
@@ -308,7 +308,7 @@ export const AdminLayout: React.FC = () => {
       <div className="flex-1 flex flex-col min-w-0">
         
         {/* Desktop Top Header Bar */}
-        <header className="hidden md:flex h-16 bg-white dark:bg-[#151821] border-b-2 border-black dark:border-gray-700 px-6 sm:px-8 items-center justify-between shrink-0">
+        <header className="hidden md:flex h-16 bg-white dark:bg-[#151821] border-b-2 border-black dark:border-gray-700 px-6 sm:px-8 items-center justify-between shrink-0 sticky top-0 z-10">
           
           {/* Breadcrumb / Page Title */}
           <div className="flex items-center gap-2 font-black text-xs tracking-wider uppercase text-gray-500 dark:text-gray-400">

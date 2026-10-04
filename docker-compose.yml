@@ -14,6 +14,11 @@ services:
       - PORT=5001
       - NODE_ENV=production
       - DISCORD_BOT_WEBHOOK_URL=${DISCORD_BOT_WEBHOOK_URL:-http://bot:5002/webhook/delivery}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+    depends_on:
+      redis:
+        condition: service_healthy
     networks:
       - nara-network
     healthcheck:
@@ -66,7 +71,25 @@ services:
       - nara-network
 
   # ==========================================
-  # Service 4: PostgreSQL Lokal (Opsional)
+  # Service 4: Redis (Ultra-Lightweight Queue for STB, ~15-25MB RAM)
+  # ==========================================
+  redis:
+    image: redis:7-alpine
+    container_name: nara-redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 64mb --maxmemory-policy noeviction --appendonly no --save ""
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - nara-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # ==========================================
+  # Service 5: PostgreSQL Lokal (Opsional)
   # Diaktifkan hanya jika ingin menggunakan database lokal di VPS
   # daripada Supabase Cloud (Jalankan: docker compose --profile db up -d)
   # ==========================================

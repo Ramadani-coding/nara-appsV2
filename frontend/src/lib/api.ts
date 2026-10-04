@@ -290,6 +290,77 @@ export async function createBackendOrder(payload: CreateOrderPayload): Promise<B
   return json;
 }
 
+export interface QueueTicketResponse {
+  success: boolean;
+  queued: boolean;
+  message: string;
+  data: {
+    ticketId: string;
+    position: number;
+    estimatedWaitSeconds: number;
+  };
+}
+
+export interface QueueTicketStatusResponse {
+  success: boolean;
+  message?: string;
+  data: {
+    ticketId: string;
+    status: "waiting" | "processing" | "completed" | "failed";
+    position: number;
+    estimatedWaitSeconds: number;
+    result?: BackendOrderResponse["data"];
+    errorMessage?: string;
+  };
+}
+
+/**
+ * Memasukkan pesanan ke sistem antrean (Queue / Ruang Tunggu Asinkron)
+ */
+export async function enqueueBackendOrder(payload: CreateOrderPayload): Promise<QueueTicketResponse> {
+  const res = await fetch(`${API_BASE_URL}/orders/checkout-queue`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.message || "Gagal memasukkan pesanan ke antrean");
+  }
+
+  return json;
+}
+
+/**
+ * Mengecek status tiket antrean di server
+ */
+export async function getQueueTicketStatus(ticketId: string): Promise<QueueTicketStatusResponse> {
+  const res = await fetch(`${API_BASE_URL}/orders/queue-status/${encodeURIComponent(ticketId)}`, {
+    headers: {
+      Accept: "application/json",
+    },
+  });
+
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.message || "Gagal memeriksa status antrean tiket");
+  }
+
+  // Jika sudah completed dan ada accessToken, simpan ke sessionStorage
+  if (json.data?.status === "completed" && json.data.result?.orderNumber && json.data.result?.accessToken) {
+    try {
+      sessionStorage.setItem(`nara_session_token_${json.data.result.orderNumber}`, json.data.result.accessToken);
+      localStorage.removeItem(`nara_token_${json.data.result.orderNumber}`);
+    } catch {}
+  }
+
+  return json;
+}
+
 export interface GetBackendOrderOptions {
   customToken?: string;
   skipToken?: boolean;

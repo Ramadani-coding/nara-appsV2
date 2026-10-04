@@ -15,6 +15,8 @@ import { db } from "../db/index.js";
 import { orders } from "../db/schema.js";
 import { eq, desc, like, or } from "drizzle-orm";
 import { createOrderLimiter, phoneValidationLimiter } from "../middleware/rateLimiter.js";
+import { enqueueCheckout, getTicketStatus } from "../queues/orderQueue.js";
+import { isRedisConnected } from "../lib/redis.js";
 
 const router = Router();
 
@@ -137,6 +139,118 @@ router.post("/validate-phone", phoneValidationLimiter, async (req: Request, res:
       success: false,
       valid: false,
       message: error.message || "Gagal memvalidasi nomor telepon",
+    });
+  }
+});
+
+/**
+ * POST /api/orders/checkout-queue
+ * Fast Ingest: Memasukkan pesanan ke antrean BullMQ (respon < 20ms, mengamankan STB dari lonjakan)
+ */
+router.post("/checkout-queue", createOrderLimiter, async (req: Request, res: Response) => {
+  try {
+    const {
+      productId,
+      packageId,
+      productName,
+      price,
+      quantity,
+      customerPhone,
+      customerEmail,
+      discordUserId,
+    } = req.body;
+
+    if (!customerPhone || !String(customerPhone).trim()) {
+      res.status(400).json({
+        success: false,
+        message: "Nomor WhatsApp wajib diisi",
+      });
+      return;
+    }
+
+    const phoneCheck = validateIndonesianPhoneLocal(String(customerPhone).trim());
+    if (!phoneCheck.isValid) {
+      res.status(400).json({
+        success: false,
+        message: phoneCheck.message || "Nomor WhatsApp tidak valid",
+      });
+      return;
+    }
+
+    const orderParams = {
+      productId: productId ? Number(productId) : undefined,
+      packageId: packageId ? String(packageId) : undefined,
+      productName,
+      price: price ? Number(price) : undefined,
+      quantity: Number(quantity) || 1,
+      customerPhone: phoneCheck.normalizedPhone || String(customerPhone).trim(),
+      customerEmail: customerEmail ? String(customerEmail).trim() : undefined,
+      discordUserId: discordUserId ? String(discordUserId).trim() : undefined,
+    };
+
+    // Jika Redis aktif, masukkan ke antrean BullMQ (Fast Response < 20ms)
+    if (isRedisConnected()) {
+      const queueData = await enqueueCheckout(orderParams);
+      res.status(202).json({
+        success: true,
+        queued: true,
+        message: "Pesanan berhasil masuk ke antrean sistem.",
+        data: queueData,
+      });
+      return;
+    }
+
+    // Fallback darurat jika Redis sedang offline (misal saat dev tanpa docker): proses langsung
+    console.warn("⚠️ [OrderRoutes] Redis tidak terhubung, fallback ke pemrosesan langsung.");
+    const orderResult = await orderService.createOrderWithQris(orderParams);
+    res.status(201).json({
+      success: true,
+      queued: false,
+      message: "Pesanan berhasil dibuat, silakan lakukan pembayaran QRIS",
+      data: orderResult,
+    });
+  } catch (error: any) {
+    console.error("Error creating queued order:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Gagal memproses antrean pesanan",
+    });
+  }
+});
+
+/**
+ * GET /api/orders/queue-status/:ticketId
+ * Polling status tiket antrean dari Redis
+ */
+router.get("/queue-status/:ticketId", async (req: Request, res: Response) => {
+  try {
+    const { ticketId } = req.params;
+    if (!ticketId) {
+      res.status(400).json({
+        success: false,
+        message: "Ticket ID wajib disertakan",
+      });
+      return;
+    }
+
+    const ticket = await getTicketStatus(ticketId);
+    if (!ticket) {
+      res.status(404).json({
+        success: false,
+        message: "Tiket antrean tidak ditemukan atau sudah kedaluwarsa.",
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      data: ticket,
+    });
+  } catch (error: any) {
+    console.error("Error fetching queue status:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Gagal memeriksa status antrean",
     });
   }
 });

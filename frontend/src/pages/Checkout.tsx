@@ -14,10 +14,11 @@ import {
   CheckCircle2,
   AlertTriangle,
   Clock,
-  Loader2
+  Loader2,
+  Users
 } from 'lucide-react';
 import { AppLogo } from '../components/AppLogo';
-import { createBackendOrder } from '../lib/api';
+import { createBackendOrder, enqueueBackendOrder, getQueueTicketStatus } from '../lib/api';
 import { 
   validatePhoneLocal, 
   validatePhoneWithBackend, 
@@ -82,6 +83,75 @@ export default function Checkout() {
   const [quantity, setQuantity] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Status antrean checkout (BullMQ Queue Ruang Tunggu)
+  interface QueueState {
+    ticketId: string;
+    position: number;
+    estimatedWaitSeconds: number;
+    status: 'waiting' | 'processing' | 'completed' | 'failed';
+    errorMessage?: string;
+  }
+  const [queueState, setQueueState] = useState<QueueState | null>(null);
+
+  // Polling status antrean otomatis setiap 1.5 detik
+  useEffect(() => {
+    if (!queueState || queueState.status === 'completed' || queueState.status === 'failed') {
+      return;
+    }
+
+    let isMounted = true;
+    const interval = setInterval(async () => {
+      try {
+        const statusRes = await getQueueTicketStatus(queueState.ticketId);
+        if (!isMounted) return;
+
+        if (statusRes.success && statusRes.data) {
+          const current = statusRes.data;
+          setQueueState((prev) => (prev ? {
+            ...prev,
+            status: current.status,
+            position: current.position,
+            estimatedWaitSeconds: current.estimatedWaitSeconds,
+          } : null));
+
+          if (current.status === 'completed' && current.result?.orderNumber) {
+            clearInterval(interval);
+            const resData = current.result;
+            const productNameWithQty = quantity > 1 
+              ? `${selectedPackage?.name} (${quantity}x)` 
+              : selectedPackage?.name;
+            const expiryParam = resData.payment?.expiryTime ? `&expiry=${encodeURIComponent(resData.payment.expiryTime)}` : '';
+
+            // Delay 600ms agar user melihat badge sukses sebelum redirect
+            setTimeout(() => {
+              if (!isMounted) return;
+              navigate(
+                `/payment/${resData.orderNumber}?amount=${resData.totalAmount}&product=${encodeURIComponent(
+                  productNameWithQty || 'Produk'
+                )}&phone=${encodeURIComponent(phone.trim())}&email=${encodeURIComponent(
+                  email.trim()
+                )}&qty=${quantity}${expiryParam}`,
+                { state: { orderData: resData } }
+              );
+            }, 600);
+          } else if (current.status === 'failed') {
+            clearInterval(interval);
+            setSubmitError(current.errorMessage || 'Gagal memproses pesanan di antrean.');
+            setQueueState(null);
+            setIsSubmitting(false);
+          }
+        }
+      } catch (err: any) {
+        console.warn('Gagal polling antrean:', err.message);
+      }
+    }, 1500);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [queueState?.ticketId, queueState?.status, quantity, selectedPackage?.name, phone, email, navigate]);
 
   // Otomatis sinkronkan kuantitas agar tidak melebihi stok / saldo akun Premku
   useEffect(() => {
@@ -208,8 +278,7 @@ export default function Checkout() {
       : selectedPackage.name;
 
     try {
-      // Panggil backend API untuk membuat pesanan dan charge QRIS Midtrans Core API
-      const res = await createBackendOrder({
+      const orderPayload = {
         productId: typeof selectedPackage.id === 'number' ? selectedPackage.id : undefined,
         packageId: String(selectedPackage.providerId || selectedPackage.id),
         productName: selectedPackage.name,
@@ -217,26 +286,41 @@ export default function Checkout() {
         quantity,
         customerPhone: phone.trim(),
         customerEmail: email.trim() || undefined,
-      });
+      };
 
-      if (res.success && res.data.orderNumber) {
-        // Navigasi ke halaman pembayaran QRIS dengan orderNumber dari backend
-        const expiryParam = res.data.payment?.expiryTime ? `&expiry=${encodeURIComponent(res.data.payment.expiryTime)}` : '';
-        navigate(
-          `/payment/${res.data.orderNumber}?amount=${res.data.totalAmount}&product=${encodeURIComponent(
-            productNameWithQty
-          )}&phone=${encodeURIComponent(phone.trim())}&email=${encodeURIComponent(
-            email.trim()
-          )}&qty=${quantity}${expiryParam}`,
-          { state: { orderData: res.data } }
-        );
+      // 1. Masukkan ke antrean BullMQ (Fast Ingest < 20ms)
+      const res = await enqueueBackendOrder(orderPayload);
+
+      if (res.success && res.queued && res.data?.ticketId) {
+        // Masuk ke antrean: buka modal Ruang Tunggu Antrean
+        setQueueState({
+          ticketId: res.data.ticketId,
+          position: res.data.position || 1,
+          estimatedWaitSeconds: res.data.estimatedWaitSeconds || 3,
+          status: 'waiting',
+        });
       } else {
-        throw new Error(res.message || 'Gagal membuat pesanan QRIS');
+        // 2. Fallback darurat jika Redis offline
+        const directRes = await createBackendOrder(orderPayload);
+        if (directRes.success && directRes.data.orderNumber) {
+          const expiryParam = directRes.data.payment?.expiryTime ? `&expiry=${encodeURIComponent(directRes.data.payment.expiryTime)}` : '';
+          navigate(
+            `/payment/${directRes.data.orderNumber}?amount=${directRes.data.totalAmount}&product=${encodeURIComponent(
+              productNameWithQty
+            )}&phone=${encodeURIComponent(phone.trim())}&email=${encodeURIComponent(
+              email.trim()
+            )}&qty=${quantity}${expiryParam}`,
+            { state: { orderData: directRes.data } }
+          );
+        } else {
+          throw new Error(directRes.message || 'Gagal membuat pesanan QRIS');
+        }
       }
     } catch (err: any) {
       console.error('Error saat membuat pesanan:', err);
       setSubmitError(err.message || 'Terjadi kendala saat menghubungi server pembayaran. Silakan coba lagi.');
       setIsSubmitting(false);
+      setQueueState(null);
     }
   };
 
@@ -665,6 +749,108 @@ export default function Checkout() {
           )}
         </button>
       </form>
+
+      {/* ========================================================
+          RUANG TUNGGU ANTREAN (MODAL NEO-BRUTALIST QUEUE SYSTEM)
+         ======================================================== */}
+      {queueState && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.92, y: 15 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="w-full max-w-md bg-white dark:bg-[#1E2333] border-4 border-black dark:border-gray-600 rounded-2xl shadow-[8px_8px_0px_#000] p-6 space-y-5 text-center text-black dark:text-white"
+          >
+            {/* Header Badge */}
+            <div className="flex justify-center">
+              {queueState.status === 'completed' ? (
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-emerald-400 text-black font-black text-xs uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] rounded-xl">
+                  <CheckCircle2 className="w-4 h-4 text-black" />
+                  <span>TRANSAKSI SIAP!</span>
+                </div>
+              ) : queueState.status === 'processing' ? (
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-brand-blue text-white font-black text-xs uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] rounded-xl">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>SEDANG MEMPROSES...</span>
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-brand-yellow text-black font-black text-xs uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] rounded-xl">
+                  <Users className="w-4 h-4" />
+                  <span>RUANG TUNGGU ANTREAN</span>
+                </div>
+              )}
+            </div>
+
+            {/* Title & Description */}
+            <div className="space-y-1">
+              <h3 className="text-xl font-black uppercase tracking-tight">
+                {queueState.status === 'completed'
+                  ? 'Pesanan Siap Dibayar!'
+                  : queueState.status === 'processing'
+                  ? 'Menyiapkan Pembayaran QRIS'
+                  : 'Pesanan Anda Dalam Antrean'}
+              </h3>
+              <p className="text-xs text-gray-600 dark:text-gray-400 font-bold">
+                {queueState.status === 'completed'
+                  ? 'Mengalihkan Anda ke halaman kode QRIS...'
+                  : queueState.status === 'processing'
+                  ? 'Sedang mengunci alokasi stok dan generate transaksi Midtrans...'
+                  : 'Sistem antrean cerdas mengamankan transaksi Anda dari lonjakan server.'}
+              </p>
+            </div>
+
+            {/* Queue Position Box */}
+            <div className="p-5 bg-[#FAF8F5] dark:bg-[#141824] border-2 border-black dark:border-gray-700 rounded-xl space-y-3 shadow-[3px_3px_0px_#000]">
+              <div className="text-[11px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                Nomor Antrean Anda
+              </div>
+              <div className="text-4xl font-black tracking-tight text-brand-blue dark:text-blue-400 font-mono">
+                {queueState.status === 'completed' ? 'SELESAI' : `#${queueState.position}`}
+              </div>
+
+              {/* Progress bar visual */}
+              <div className="w-full bg-gray-200 dark:bg-gray-800 h-3 rounded-full border border-black dark:border-gray-700 overflow-hidden relative">
+                <motion.div
+                  className={`h-full ${
+                    queueState.status === 'completed'
+                      ? 'bg-emerald-500'
+                      : queueState.status === 'processing'
+                      ? 'bg-brand-blue'
+                      : 'bg-brand-yellow'
+                  }`}
+                  animate={{
+                    width:
+                      queueState.status === 'completed'
+                        ? '100%'
+                        : queueState.status === 'processing'
+                        ? '85%'
+                        : `${Math.max(15, 100 - queueState.position * 15)}%`,
+                  }}
+                  transition={{ duration: 0.5 }}
+                />
+              </div>
+
+              <div className="flex items-center justify-between text-[11px] font-bold text-gray-600 dark:text-gray-400">
+                <span className="flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5" />
+                  Est. Tunggu: ~{queueState.estimatedWaitSeconds}s
+                </span>
+                <span className="font-mono text-[10px] text-gray-400">
+                  ID: {queueState.ticketId.slice(0, 14)}...
+                </span>
+              </div>
+            </div>
+
+            {/* Important Info Note */}
+            <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-400 rounded-xl text-left text-xs font-semibold text-amber-900 dark:text-amber-200 flex items-start gap-2.5">
+              <span className="text-base leading-none">💡</span>
+              <p className="leading-relaxed text-[11px]">
+                Server STB memproses antrean secara bergantian agar pesanan tidak tabrakan. 
+                <strong className="block mt-0.5 font-bold">Harap tidak me-refresh atau menutup tab browser ini.</strong>
+              </p>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </motion.div>
   );
 }

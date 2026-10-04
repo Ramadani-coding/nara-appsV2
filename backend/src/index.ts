@@ -1,5 +1,7 @@
 import { app } from "./app.js";
 import { startAutoSyncWorker, stopAutoSyncWorker } from "./workers/autoSyncWorker.js";
+import { startOrderQueueWorker, stopOrderQueueWorker } from "./workers/orderQueueWorker.js";
+import { redisConnection } from "./lib/redis.js";
 import "dotenv/config";
 
 const DEFAULT_PORT = Number(process.env.PORT) || 5001;
@@ -12,6 +14,9 @@ function startServer(port: number) {
     
     // Aktifkan background sync worker
     startAutoSyncWorker();
+
+    // Aktifkan background queue worker untuk antrean checkout order
+    startOrderQueueWorker();
   });
 
   server.on("error", (err: any) => {
@@ -24,9 +29,14 @@ function startServer(port: number) {
   });
 
   // Graceful shutdown handling untuk Docker / container lifecycle
-  const shutdown = (signal: string) => {
+  const shutdown = async (signal: string) => {
     console.log(`\n🛑 Menerima ${signal}. Menghentikan server dengan graceful...`);
     stopAutoSyncWorker();
+    await stopOrderQueueWorker();
+    try {
+      await redisConnection.quit();
+    } catch {}
+
     server.close(() => {
       console.log("✅ Server HTTP berhasil dihentikan.");
       process.exit(0);
