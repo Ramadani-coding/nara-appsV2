@@ -16,8 +16,7 @@ import {
   Send,
   Copy,
   Check,
-  ExternalLink,
-  MessageCircle
+  ExternalLink
 } from "lucide-react";
 import { API_BASE_URL, adminFetch } from "../../lib/api";
 
@@ -125,6 +124,14 @@ function DiscordIcon({ className = "w-3.5 h-3.5" }: { className?: string }) {
   return (
     <svg className={`${className} fill-current`} viewBox="0 0 24 24">
       <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.893.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+    </svg>
+  );
+}
+
+function WhatsAppIcon({ className = "w-3.5 h-3.5" }: { className?: string }) {
+  return (
+    <svg className={`${className} fill-current`} viewBox="0 0 24 24">
+      <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
     </svg>
   );
 }
@@ -304,12 +311,21 @@ export default function AdminOrders() {
   const [submittingDelivery, setSubmittingDelivery] = useState(false);
   const [deliverySuccessMsg, setDeliverySuccessMsg] = useState<string | null>(null);
   const [copiedDeliveryKey, setCopiedDeliveryKey] = useState<string | null>(null);
+  const [copiedOrderNumber, setCopiedOrderNumber] = useState<string | null>(null);
   const [syncingProvider, setSyncingProvider] = useState(false);
   const [actionToast, setActionToast] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const showToast = (type: "success" | "error", text: string) => {
     setActionToast({ type, text });
     setTimeout(() => setActionToast(null), 4000);
+  };
+
+  const handleCopyOrderNumber = (e: React.MouseEvent, orderNumber: string) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(orderNumber);
+    setCopiedOrderNumber(orderNumber);
+    showToast("success", `Nomor order ${orderNumber} berhasil disalin!`);
+    setTimeout(() => setCopiedOrderNumber(null), 2000);
   };
 
   // Close modal on Escape key
@@ -527,8 +543,8 @@ export default function AdminOrders() {
     // Cek jika pesanan terdeteksi Expired dari Midtrans
     if (order && isOrderExpired(order)) {
       return (
-        <span className="px-2.5 py-1 bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 font-extrabold text-xs uppercase border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] rounded-lg inline-flex items-center gap-1">
-          <XCircle className="w-3 h-3" />
+        <span className="px-2.5 py-1 bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 font-bold text-xs rounded-lg border border-rose-200 dark:border-rose-800/60 inline-flex items-center gap-1.5 shadow-2xs">
+          <XCircle className="w-3.5 h-3.5 text-rose-500" />
           <span>Expired</span>
         </span>
       );
@@ -537,8 +553,8 @@ export default function AdminOrders() {
     switch (status) {
       case "completed":
         return (
-          <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-extrabold text-xs uppercase border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] rounded-lg inline-flex items-center gap-1">
-            <CheckCircle2 className="w-3 h-3" />
+          <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold text-xs rounded-lg border border-emerald-200 dark:border-emerald-800/60 inline-flex items-center gap-1.5 shadow-2xs">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
             <span>Selesai</span>
           </span>
         );
@@ -547,12 +563,12 @@ export default function AdminOrders() {
           order.deliveries.every(d => parseDeliveryContent(d.content).accounts.length === 0));
         return (
           <div className="inline-flex flex-col items-start gap-1">
-            <span className="px-2.5 py-1 bg-brand-blue-soft text-brand-blue dark:bg-blue-950 dark:text-blue-300 font-extrabold text-xs uppercase border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] rounded-lg inline-flex items-center gap-1">
-              <Clock className="w-3 h-3" />
+            <span className="px-2.5 py-1 bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 font-bold text-xs rounded-lg border border-blue-200 dark:border-blue-800/60 inline-flex items-center gap-1.5 shadow-2xs">
+              <Clock className="w-3.5 h-3.5 text-blue-500" />
               <span>Lunas</span>
             </span>
             {needsDelivery && (
-              <span className="px-1.5 py-0.5 bg-amber-400 text-black font-black text-[9px] uppercase border border-black rounded shadow-[1px_1px_0px_#000]">
+              <span className="px-2 py-0.5 bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 font-bold text-[10px] uppercase border border-amber-300 dark:border-amber-800 rounded-md">
                 ⚠️ Butuh Akun
               </span>
             )}
@@ -564,12 +580,12 @@ export default function AdminOrders() {
           order.deliveries.every(d => parseDeliveryContent(d.content).accounts.length === 0));
         return (
           <div className="inline-flex flex-col items-start gap-1">
-            <span className="px-2.5 py-1 bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 font-extrabold text-xs uppercase border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] rounded-lg inline-flex items-center gap-1">
-              <Clock className="w-3 h-3" />
+            <span className="px-2.5 py-1 bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 font-bold text-xs rounded-lg border border-amber-200 dark:border-amber-800/60 inline-flex items-center gap-1.5 shadow-2xs">
+              <Clock className="w-3.5 h-3.5 text-amber-500" />
               <span>Diproses</span>
             </span>
             {needsDelivery && (
-              <span className="px-1.5 py-0.5 bg-amber-400 text-black font-black text-[9px] uppercase border border-black rounded shadow-[1px_1px_0px_#000]">
+              <span className="px-2 py-0.5 bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 font-bold text-[10px] uppercase border border-amber-300 dark:border-amber-800 rounded-md">
                 ⚠️ Butuh Akun
               </span>
             )}
@@ -578,8 +594,8 @@ export default function AdminOrders() {
       }
       case "waiting_payment":
         return (
-          <span className="px-2.5 py-1 bg-yellow-100 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-300 font-extrabold text-xs uppercase border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] rounded-lg inline-flex items-center gap-1">
-            <Clock className="w-3 h-3" />
+          <span className="px-2.5 py-1 bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 font-bold text-xs rounded-lg border border-amber-200 dark:border-amber-800/60 inline-flex items-center gap-1.5 shadow-2xs">
+            <Clock className="w-3.5 h-3.5 text-amber-500" />
             <span>Menunggu Bayar</span>
           </span>
         );
@@ -588,8 +604,8 @@ export default function AdminOrders() {
         const failure = order ? getOrderFailureReason(order) : null;
         return (
           <div className="inline-flex flex-col items-start gap-1">
-            <span className="px-2.5 py-1 bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300 font-extrabold text-xs uppercase border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] rounded-lg inline-flex items-center gap-1">
-              <AlertCircle className="w-3 h-3" />
+            <span className="px-2.5 py-1 bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 font-bold text-xs rounded-lg border border-rose-200 dark:border-rose-800/60 inline-flex items-center gap-1.5 shadow-2xs">
+              <AlertCircle className="w-3.5 h-3.5 text-rose-500" />
               <span>{failure?.badge || "Gagal"}</span>
             </span>
             {failure && (
@@ -727,7 +743,22 @@ export default function AdminOrders() {
                 orders.map((order) => (
                   <tr key={order.id} className="hover:bg-gray-50 dark:hover:bg-[#1E2333]/40 transition-colors">
                     <td className="py-3.5 px-4 font-mono font-black text-black dark:text-white whitespace-nowrap">
-                      {order.orderNumber}
+                      <button
+                        type="button"
+                        onClick={(e) => handleCopyOrderNumber(e, order.orderNumber)}
+                        title="Klik untuk menyalin nomor order"
+                        className="group inline-flex items-center gap-1.5 hover:text-brand-blue transition-colors cursor-pointer text-left"
+                      >
+                        <span>{order.orderNumber}</span>
+                        {copiedOrderNumber === order.orderNumber ? (
+                          <span className="inline-flex items-center gap-0.5 text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
+                            <Check className="w-3 h-3" />
+                            <span>Tersalin</span>
+                          </span>
+                        ) : (
+                          <Copy className="w-3.5 h-3.5 text-gray-400 opacity-60 group-hover:opacity-100 group-hover:text-brand-blue transition-all" />
+                        )}
+                      </button>
                     </td>
                     <td className="py-3.5 px-4">
                       {isDiscordOrder(order) ? (
@@ -833,9 +864,22 @@ export default function AdminOrders() {
               <div className="flex items-center justify-between gap-2 border-b-2 border-black dark:border-gray-700 pb-2.5">
                 <div>
                   <div className="text-[10px] font-black uppercase text-gray-500">NOMOR ORDER</div>
-                  <div className="font-mono font-black text-sm text-black dark:text-white">
-                    {order.orderNumber}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => handleCopyOrderNumber(e, order.orderNumber)}
+                    title="Klik untuk menyalin nomor order"
+                    className="font-mono font-black text-sm text-black dark:text-white group inline-flex items-center gap-1.5 hover:text-brand-blue transition-colors cursor-pointer"
+                  >
+                    <span>{order.orderNumber}</span>
+                    {copiedOrderNumber === order.orderNumber ? (
+                      <span className="inline-flex items-center gap-0.5 text-[9px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
+                        <Check className="w-2.5 h-2.5" />
+                        <span>Tersalin</span>
+                      </span>
+                    ) : (
+                      <Copy className="w-3 h-3 text-gray-400 opacity-60 group-hover:opacity-100 group-hover:text-brand-blue transition-all" />
+                    )}
+                  </button>
                 </div>
                 <div>{getStatusBadge(order.status, order)}</div>
               </div>
@@ -860,7 +904,7 @@ export default function AdminOrders() {
                         href={formatWhatsAppUrl(order.customerPhone, order.orderNumber)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="hover:text-emerald-600 hover:underline inline-flex items-center gap-1 truncate font-mono"
+                        className="hover:text-emerald-600 hover:underline inline-flex items-center gap-1 truncate font-mono text-xs"
                         title="Hubungi via WhatsApp"
                       >
                         <span>{order.customerPhone}</span>
@@ -871,9 +915,10 @@ export default function AdminOrders() {
                       href={formatWhatsAppUrl(order.customerPhone, order.orderNumber)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-2 py-0.5 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-[9px] uppercase rounded border border-black shadow-[1px_1px_0px_#000] shrink-0 inline-flex items-center gap-1"
+                      className="px-2.5 py-1 bg-[#25D366] hover:bg-[#20ba5a] text-white font-bold text-[10px] rounded-lg shadow-sm hover:shadow transition-all duration-150 active:scale-95 shrink-0 inline-flex items-center gap-1"
+                      title="Hubungi via WhatsApp"
                     >
-                      <MessageCircle className="w-2.5 h-2.5" />
+                      <WhatsAppIcon className="w-3 h-3" />
                       <span>Chat WA</span>
                     </a>
                   </div>
@@ -978,8 +1023,25 @@ export default function AdminOrders() {
                       Detail Pesanan
                     </h2>
                   </div>
-                  <div className="font-mono text-xs font-bold text-gray-500">
-                    Order ID: {selectedOrder.orderNumber} (Ref: {selectedOrder.refId})
+                  <div className="font-mono text-xs font-bold text-gray-500 flex items-center gap-1.5 flex-wrap">
+                    <span>Order ID:</span>
+                    <button
+                      type="button"
+                      onClick={(e) => handleCopyOrderNumber(e, selectedOrder.orderNumber)}
+                      title="Klik untuk menyalin nomor order"
+                      className="group inline-flex items-center gap-1 text-black dark:text-white hover:text-brand-blue font-black transition-colors cursor-pointer"
+                    >
+                      <span>{selectedOrder.orderNumber}</span>
+                      {copiedOrderNumber === selectedOrder.orderNumber ? (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
+                          <Check className="w-2.5 h-2.5" />
+                          <span>Tersalin</span>
+                        </span>
+                      ) : (
+                        <Copy className="w-3 h-3 text-gray-400 opacity-60 group-hover:opacity-100 group-hover:text-brand-blue transition-all" />
+                      )}
+                    </button>
+                    <span className="text-gray-400">(Ref: {selectedOrder.refId})</span>
                   </div>
                 </div>
 
@@ -995,7 +1057,7 @@ export default function AdminOrders() {
 
               {/* Customer & Info Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-3.5 bg-gray-50 dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] rounded-xl space-y-1.5">
+                <div className="p-4 bg-gray-50 dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] rounded-xl space-y-3">
                   <div className="text-[10px] font-black uppercase text-gray-500 tracking-wider">
                     DATA PEMBELI
                   </div>
@@ -1003,59 +1065,54 @@ export default function AdminOrders() {
                     <div className="text-xs font-bold flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 min-w-0">
                         <DiscordIcon className="w-3.5 h-3.5 text-[#5865F2] shrink-0" />
-                        <span className="text-gray-700 dark:text-gray-300">Discord:</span>
+                        <span className="text-gray-600 dark:text-gray-400 font-semibold">Discord:</span>
                         <span className="font-mono text-[#5865F2] dark:text-[#7983f5] truncate">
                           {selectedOrder.customerPhone}
                         </span>
                       </div>
-                      <span className="px-2.5 py-0.5 bg-[#5865F2]/10 text-[#5865F2] dark:text-[#7983f5] border border-[#5865F2]/30 font-black text-[10px] uppercase rounded shrink-0">
+                      <span className="px-2.5 py-1 bg-[#5865F2]/10 text-[#5865F2] dark:text-[#7983f5] border border-[#5865F2]/30 font-bold text-[10px] uppercase rounded-lg shrink-0">
                         Pembelian Discord
                       </span>
                     </div>
                   ) : (
                     <div className="text-xs font-bold flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <Phone className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                        <span className="text-gray-700 dark:text-gray-300">WhatsApp:</span>
-                        <a
-                          href={formatWhatsAppUrl(selectedOrder.customerPhone, selectedOrder.orderNumber)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="font-mono text-emerald-600 dark:text-emerald-400 hover:underline inline-flex items-center gap-1"
-                          title="Klik untuk chat WhatsApp"
-                        >
-                          <span>{selectedOrder.customerPhone}</span>
-                          <ExternalLink className="w-2.5 h-2.5 shrink-0" />
-                        </a>
+                        <Phone className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <span className="text-gray-600 dark:text-gray-400 font-semibold">WhatsApp:</span>
+                        <span className="font-mono text-gray-900 dark:text-gray-100 truncate">
+                          {selectedOrder.customerPhone}
+                        </span>
                       </div>
                       <a
                         href={formatWhatsAppUrl(selectedOrder.customerPhone, selectedOrder.orderNumber)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-[10px] uppercase rounded border border-black shadow-[1.5px_1.5px_0px_#000] hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none transition-all cursor-pointer inline-flex items-center gap-1 shrink-0"
+                        className="px-3 py-1.5 bg-[#25D366] hover:bg-[#20ba5a] text-white font-bold text-xs rounded-lg shadow-sm hover:shadow transition-all duration-150 active:scale-95 inline-flex items-center gap-1.5 shrink-0"
                         title="Hubungi pembeli via WhatsApp"
                       >
-                        <MessageCircle className="w-3 h-3" />
+                        <WhatsAppIcon className="w-3.5 h-3.5" />
                         <span>Chat WA</span>
                       </a>
                     </div>
                   )}
-                  <div className="text-xs font-bold flex items-center gap-1.5">
-                    <Mail className="w-3.5 h-3.5 text-brand-blue" />
-                    <span>Email: {selectedOrder.customerEmail || "Tidak ada email"}</span>
+                  <div className="text-xs font-bold flex items-center gap-1.5 pt-0.5 text-gray-700 dark:text-gray-300 border-t border-gray-200/70 dark:border-gray-800/70">
+                    <Mail className="w-3.5 h-3.5 text-brand-blue shrink-0" />
+                    <span className="text-gray-500 dark:text-gray-400 font-semibold">Email:</span>
+                    <span className="truncate">{selectedOrder.customerEmail || "Tidak ada email"}</span>
                   </div>
                 </div>
 
-                <div className="p-3.5 bg-gray-50 dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] rounded-xl space-y-1.5">
+                <div className="p-4 bg-gray-50 dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] rounded-xl space-y-3">
                   <div className="text-[10px] font-black uppercase text-gray-500 tracking-wider">
                     STATUS & WAKTU
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold">Status:</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-gray-600 dark:text-gray-400">Status:</span>
                     {getStatusBadge(selectedOrder.status, selectedOrder)}
                   </div>
-                  <div className="text-[11px] font-mono text-gray-500">
-                    Dibuat: {new Date(selectedOrder.createdAt).toLocaleString("id-ID")}
+                  <div className="text-[11px] font-mono text-gray-500 flex items-center gap-1.5 pt-0.5 border-t border-gray-200/70 dark:border-gray-800/70">
+                    <Clock className="w-3 h-3 text-gray-400 shrink-0" />
+                    <span>Dibuat: {new Date(selectedOrder.createdAt).toLocaleString("id-ID")}</span>
                   </div>
                 </div>
               </div>

@@ -6,12 +6,15 @@ import {
   ShoppingBag, 
   Clock, 
   CheckCircle2, 
+  XCircle,
   AlertCircle, 
   Wallet, 
   ArrowRight, 
   RefreshCw, 
   Layers, 
-  TrendingUp
+  TrendingUp,
+  Copy,
+  Check
 } from "lucide-react";
 import { adminFetch } from "../../lib/api";
 
@@ -32,6 +35,14 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
+  const [copiedOrderNumber, setCopiedOrderNumber] = useState<string | null>(null);
+
+  const handleCopyOrderNumber = (e: React.MouseEvent, orderNumber: string) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(orderNumber);
+    setCopiedOrderNumber(orderNumber);
+    setTimeout(() => setCopiedOrderNumber(null), 2000);
+  };
 
   const fetchStats = async () => {
     setLoading(true);
@@ -88,8 +99,9 @@ export default function AdminDashboard() {
     const payStatus = (payment?.status || raw?.transaction_status || "").toLowerCase();
     if (payStatus === "expire" || payStatus === "expired" || /expire/i.test(raw?.status_message || "")) {
       return (
-        <span className="px-2 py-0.5 bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 font-extrabold text-[10px] uppercase border border-black dark:border-gray-700 shadow-[1px_1px_0px_#000] rounded">
-          Expired
+        <span className="px-2 py-0.5 bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 font-bold text-[10px] rounded-md border border-rose-200 dark:border-rose-800/60 inline-flex items-center gap-1 shadow-2xs">
+          <XCircle className="w-3 h-3 text-rose-500" />
+          <span>Expired</span>
         </span>
       );
     }
@@ -97,33 +109,38 @@ export default function AdminDashboard() {
     switch (status) {
       case "completed":
         return (
-          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-extrabold text-[10px] uppercase border border-black dark:border-gray-700 shadow-[1px_1px_0px_#000] rounded">
-            Selesai
+          <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold text-[10px] rounded-md border border-emerald-200 dark:border-emerald-800/60 inline-flex items-center gap-1 shadow-2xs">
+            <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+            <span>Selesai</span>
           </span>
         );
       case "paid":
         return (
-          <span className="px-2 py-0.5 bg-brand-blue-soft text-brand-blue dark:bg-blue-950 dark:text-blue-300 font-extrabold text-[10px] uppercase border border-black dark:border-gray-700 shadow-[1px_1px_0px_#000] rounded">
-            Lunas
+          <span className="px-2 py-0.5 bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 font-bold text-[10px] rounded-md border border-blue-200 dark:border-blue-800/60 inline-flex items-center gap-1 shadow-2xs">
+            <Clock className="w-3 h-3 text-blue-500" />
+            <span>Lunas</span>
           </span>
         );
       case "processing":
         return (
-          <span className="px-2 py-0.5 bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 font-extrabold text-[10px] uppercase border border-black dark:border-gray-700 shadow-[1px_1px_0px_#000] rounded">
-            Diproses
+          <span className="px-2 py-0.5 bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 font-bold text-[10px] rounded-md border border-amber-200 dark:border-amber-800/60 inline-flex items-center gap-1 shadow-2xs">
+            <Clock className="w-3 h-3 text-amber-500" />
+            <span>Diproses</span>
           </span>
         );
       case "waiting_payment":
         return (
-          <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-300 font-extrabold text-[10px] uppercase border border-black dark:border-gray-700 shadow-[1px_1px_0px_#000] rounded">
-            Menunggu Bayar
+          <span className="px-2 py-0.5 bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 font-bold text-[10px] rounded-md border border-amber-200 dark:border-amber-800/60 inline-flex items-center gap-1 shadow-2xs">
+            <Clock className="w-3 h-3 text-amber-500" />
+            <span>Menunggu Bayar</span>
           </span>
         );
       case "failed":
       default:
         return (
-          <span className="px-2 py-0.5 bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300 font-extrabold text-[10px] uppercase border border-black dark:border-gray-700 shadow-[1px_1px_0px_#000] rounded">
-            Gagal
+          <span className="px-2 py-0.5 bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 font-bold text-[10px] rounded-md border border-rose-200 dark:border-rose-800/60 inline-flex items-center gap-1 shadow-2xs">
+            <AlertCircle className="w-3 h-3 text-rose-500" />
+            <span>Gagal</span>
           </span>
         );
     }
@@ -332,8 +349,23 @@ export default function AdminDashboard() {
                 {stats && stats.recentOrders && stats.recentOrders.length > 0 ? (
                   stats.recentOrders.map((order: any) => (
                     <tr key={order.id} className="hover:bg-gray-50 dark:hover:bg-[#1E2333]/50">
-                      <td className="py-3 px-2 font-mono font-bold text-black dark:text-white">
-                        {order.orderNumber}
+                      <td className="py-3 px-2 font-mono font-bold text-black dark:text-white whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={(e) => handleCopyOrderNumber(e, order.orderNumber)}
+                          title="Klik untuk menyalin nomor order"
+                          className="group inline-flex items-center gap-1.5 hover:text-brand-blue transition-colors cursor-pointer text-left"
+                        >
+                          <span>{order.orderNumber}</span>
+                          {copiedOrderNumber === order.orderNumber ? (
+                            <span className="inline-flex items-center gap-0.5 text-[9px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/60 px-1 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
+                              <Check className="w-2.5 h-2.5" />
+                              <span>Tersalin</span>
+                            </span>
+                          ) : (
+                            <Copy className="w-3 h-3 text-gray-400 opacity-60 group-hover:opacity-100 group-hover:text-brand-blue transition-all" />
+                          )}
+                        </button>
                       </td>
                       <td className="py-3 px-2">
                         <div className="font-bold text-black dark:text-white truncate max-w-[140px]">
@@ -380,9 +412,22 @@ export default function AdminDashboard() {
                   className="p-3.5 bg-gray-50 dark:bg-[#12141C] border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] rounded-xl space-y-2.5"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-mono font-black text-xs text-black dark:text-white">
-                      {order.orderNumber}
-                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => handleCopyOrderNumber(e, order.orderNumber)}
+                      title="Klik untuk menyalin nomor order"
+                      className="font-mono font-black text-xs text-black dark:text-white group inline-flex items-center gap-1 hover:text-brand-blue transition-colors cursor-pointer"
+                    >
+                      <span>{order.orderNumber}</span>
+                      {copiedOrderNumber === order.orderNumber ? (
+                        <span className="inline-flex items-center gap-0.5 text-[8px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/60 px-1 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
+                          <Check className="w-2 h-2" />
+                          <span>Tersalin</span>
+                        </span>
+                      ) : (
+                        <Copy className="w-2.5 h-2.5 text-gray-400 opacity-60 group-hover:opacity-100 group-hover:text-brand-blue transition-all" />
+                      )}
+                    </button>
                     {getStatusBadge(order.status, order)}
                   </div>
 
