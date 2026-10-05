@@ -373,23 +373,46 @@ export const OrderInvoiceCard: React.FC<OrderInvoiceCardProps> = ({
             </div>
           ) : invoice.isDeliveryPending || invoice.accounts.length === 0 ? (
             /* State: Sudah Lunas, Sedang Diproses Sistem */
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50/70 dark:from-blue-950/30 dark:to-indigo-950/20 border-2 border-black dark:border-blue-700/80 p-5 rounded-2xl shadow-[4px_4px_0px_#000] space-y-3.5">
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50/70 dark:from-blue-950/30 dark:to-indigo-950/20 border-2 border-black dark:border-blue-700/80 p-5 sm:p-6 rounded-2xl shadow-[4px_4px_0px_#000] space-y-4">
               <div className="flex items-start gap-3.5">
                 <div className="w-10 h-10 rounded-xl bg-brand-blue text-white border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000] shrink-0 animate-pulse">
                   <Loader2 className="w-5 h-5 animate-spin" />
                 </div>
-                <div className="space-y-1">
-                  <h4 className="font-black text-sm text-black dark:text-white flex items-center gap-2">
-                    <span>Sedang Menyiapkan Detail Akun Anda...</span>
-                  </h4>
+                <div className="space-y-1.5 flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h4 className="font-black text-sm sm:text-base text-black dark:text-white">
+                      Menyiapkan Akun Digital Anda...
+                    </h4>
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 bg-emerald-300 text-black border border-black rounded shadow-[1px_1px_0px_#000]">
+                      PEMBAYARAN LUNAS (100% AMAN)
+                    </span>
+                  </div>
                   <p className="text-xs text-gray-700 dark:text-gray-300 font-medium leading-relaxed">
-                    Pembayaran Anda telah diverifikasi <strong className="text-emerald-700 dark:text-emerald-400">LUNAS</strong>. Sistem saat ini sedang memproses dan menyiapkan kredensial akun digital Anda ({invoice.qty}x unit) secara otomatis.
+                    Pembayaran Anda telah diverifikasi <strong className="text-emerald-700 dark:text-emerald-400">LUNAS</strong>. Sistem atau admin Nara saat ini sedang memproses dan mengalokasikan kredensial akun digital Anda ({invoice.qty}x unit).
                   </p>
                   <div className="flex items-center gap-2 pt-1 text-[11px] font-bold text-brand-blue dark:text-cyan-300">
                     <span className="inline-block w-2 h-2 rounded-full bg-brand-blue animate-ping" />
-                    <span>Halaman ini akan otomatis memperbarui data akun tanpa perlu refresh...</span>
+                    <span>Halaman ini akan otomatis memperbarui data akun begitu siap tanpa perlu refresh...</span>
                   </div>
                 </div>
+              </div>
+
+              {/* Action Banner for Customer: Contact WhatsApp Admin */}
+              <div className="pt-2 border-t border-dashed border-blue-200 dark:border-blue-900 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <span className="text-[11px] font-bold text-gray-600 dark:text-gray-400">
+                  Butuh akun segera atau ada pertanyaan?
+                </span>
+                <a
+                  href={`https://wa.me/6285750231336?text=${encodeURIComponent(
+                    `Halo Admin Nara Premium, saya sudah melunasi pesanan #${invoice.id} (${invoice.productName}) senilai Rp ${invoice.total.toLocaleString('id-ID')}, mohon bantu dicek ya min!`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black uppercase tracking-wider rounded-lg border border-black shadow-[1.5px_1.5px_0px_#000] cursor-pointer transition-all active:translate-x-0.5 active:translate-y-0.5 shrink-0"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  <span>Chat Admin via WhatsApp</span>
+                </a>
               </div>
             </div>
           ) : (

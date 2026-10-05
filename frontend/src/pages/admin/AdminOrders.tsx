@@ -329,6 +329,8 @@ export default function AdminOrders() {
     setTimeout(() => setCopiedDeliveryKey(null), 2000);
   };
 
+  const [retryingProvider, setRetryingProvider] = useState(false);
+
   const handleSyncProvider = async () => {
     if (!selectedOrder) return;
     setSyncingProvider(true);
@@ -348,6 +350,32 @@ export default function AdminOrders() {
       showToast("error", `Error sinkronisasi: ${err.message}`);
     } finally {
       setSyncingProvider(false);
+    }
+  };
+
+  const handleRetryProvider = async () => {
+    if (!selectedOrder) return;
+    setRetryingProvider(true);
+    try {
+      const res = await adminFetch(`/admin/orders/${selectedOrder.id}/retry-provider`, {
+        method: "POST",
+      });
+      const json = await res.json();
+      if (json.success) {
+        if (json.order) {
+          setSelectedOrder(json.order);
+          setOrders(prev => prev.map(o => o.id === json.order.id ? json.order : o));
+        } else {
+          await fetchOrders();
+        }
+        showToast("success", json.message || "Pesanan berhasil diproses ulang ke supplier!");
+      } else {
+        showToast("error", json.message || "Gagal memproses ulang pesanan ke supplier");
+      }
+    } catch (err: any) {
+      showToast("error", `Error memproses ulang: ${err.message}`);
+    } finally {
+      setRetryingProvider(false);
     }
   };
 
@@ -514,20 +542,40 @@ export default function AdminOrders() {
             <span>Selesai</span>
           </span>
         );
-      case "paid":
+      case "paid": {
+        const needsDelivery = order && (!order.deliveries || order.deliveries.length === 0 || 
+          order.deliveries.every(d => parseDeliveryContent(d.content).accounts.length === 0));
         return (
-          <span className="px-2.5 py-1 bg-brand-blue-soft text-brand-blue dark:bg-blue-950 dark:text-blue-300 font-extrabold text-xs uppercase border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] rounded-lg inline-flex items-center gap-1">
-            <Clock className="w-3 h-3" />
-            <span>Lunas</span>
-          </span>
+          <div className="inline-flex flex-col items-start gap-1">
+            <span className="px-2.5 py-1 bg-brand-blue-soft text-brand-blue dark:bg-blue-950 dark:text-blue-300 font-extrabold text-xs uppercase border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] rounded-lg inline-flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              <span>Lunas</span>
+            </span>
+            {needsDelivery && (
+              <span className="px-1.5 py-0.5 bg-amber-400 text-black font-black text-[9px] uppercase border border-black rounded shadow-[1px_1px_0px_#000]">
+                ⚠️ Butuh Akun
+              </span>
+            )}
+          </div>
         );
-      case "processing":
+      }
+      case "processing": {
+        const needsDelivery = order && (!order.deliveries || order.deliveries.length === 0 || 
+          order.deliveries.every(d => parseDeliveryContent(d.content).accounts.length === 0));
         return (
-          <span className="px-2.5 py-1 bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 font-extrabold text-xs uppercase border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] rounded-lg inline-flex items-center gap-1">
-            <Clock className="w-3 h-3" />
-            <span>Diproses</span>
-          </span>
+          <div className="inline-flex flex-col items-start gap-1">
+            <span className="px-2.5 py-1 bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 font-extrabold text-xs uppercase border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] rounded-lg inline-flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              <span>Diproses</span>
+            </span>
+            {needsDelivery && (
+              <span className="px-1.5 py-0.5 bg-amber-400 text-black font-black text-[9px] uppercase border border-black rounded shadow-[1px_1px_0px_#000]">
+                ⚠️ Butuh Akun
+              </span>
+            )}
+          </div>
         );
+      }
       case "waiting_payment":
         return (
           <span className="px-2.5 py-1 bg-yellow-100 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-300 font-extrabold text-xs uppercase border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] rounded-lg inline-flex items-center gap-1">
@@ -1103,6 +1151,51 @@ export default function AdminOrders() {
                     <span>Data Pengiriman Produk Digital (Akun / Lisensi)</span>
                   </div>
                 </div>
+
+                {/* Banner Peringatan & Tombol Proses Ulang jika pesanan lunas tapi akun belum terbit */}
+                {((selectedOrder.status === 'paid' || selectedOrder.status === 'processing') && 
+                  (!selectedOrder.deliveries || selectedOrder.deliveries.length === 0 || 
+                    selectedOrder.deliveries.every(d => parseDeliveryContent(d.content).accounts.length === 0))) && (
+                  <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-500 shadow-[3px_3px_0px_#000] rounded-xl space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2 border-b border-amber-200 dark:border-amber-900 pb-2">
+                      <div className="flex items-center gap-2 text-amber-900 dark:text-amber-300 font-black text-xs uppercase tracking-wider">
+                        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>PERLU TINDAKAN: PESANAN LUNAS BELUM TERBIT AKUN</span>
+                      </div>
+                      <span className="px-2 py-0.5 bg-amber-400 text-black font-black text-[10px] uppercase rounded border border-black shadow-[1px_1px_0px_#000]">
+                        ACTION REQUIRED
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-amber-900 dark:text-amber-200 font-medium leading-relaxed">
+                      Pelanggan telah <strong>melunasi pembayaran QRIS</strong>, namun pembuatan pesanan ke supplier sebelumnya tertunda atau saldo Supplier Anda sempat tidak mencukupi saat transaksi masuk. Pastikan saldo di Supplier Anda sudah terisi, lalu klik tombol di bawah untuk memproses ulang:
+                    </p>
+
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        disabled={retryingProvider}
+                        onClick={handleRetryProvider}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-yellow hover:bg-yellow-400 text-black text-xs font-black uppercase tracking-wider rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] neo-btn cursor-pointer disabled:opacity-50 transition-all active:translate-x-0.5 active:translate-y-0.5"
+                      >
+                        <RefreshCw className={`w-4 h-4 ${retryingProvider ? "animate-spin" : ""}`} />
+                        <span>{retryingProvider ? "Memproses Ulang ke Premku..." : "🔄 Proses Ulang ke Premku (Retry)"}</span>
+                      </button>
+
+                      {selectedOrder.deliveries?.some(d => parseDeliveryContent(d.content).invoice) && (
+                        <button
+                          type="button"
+                          disabled={syncingProvider}
+                          onClick={handleSyncProvider}
+                          className="inline-flex items-center gap-1.5 px-3 py-2 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-xs font-bold rounded-xl border border-gray-400 hover:bg-gray-100 transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${syncingProvider ? "animate-spin" : ""}`} />
+                          <span>Cek Status Invoice Supplier</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Existing Deliveries if any */}
                 {selectedOrder.deliveries && selectedOrder.deliveries.length > 0 ? (

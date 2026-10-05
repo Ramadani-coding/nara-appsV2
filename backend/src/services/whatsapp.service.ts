@@ -407,6 +407,45 @@ export async function sendOrderCompletedNotification(
   return sendOrderSuccessNotification(phone, orderNumber, productName, 0, clientUrl);
 }
 
+/**
+ * Notifikasi instan ke WhatsApp Admin saat pesanan LUNAS tetapi gagal auto-order ke supplier Premku
+ */
+export async function notifyAdminSupplierFailed(
+  orderNumber: string,
+  productName: string,
+  customerPhone: string,
+  totalAmount: number,
+  errorMessage: string
+): Promise<void> {
+  const adminPhone = process.env.ADMIN_WHATSAPP_PHONE?.trim();
+  if (!adminPhone) {
+    console.warn("⚠️ ADMIN_WHATSAPP_PHONE belum diatur di .env");
+    return;
+  }
+
+  const message = `🚨 *PERINGATAN ORDER TERTUNDA - NARA STORE*
+
+Nomor Pesanan : *#${orderNumber}*
+Produk        : ${productName}
+Pembeli       : ${customerPhone}
+Total Bayar   : Rp${Number(totalAmount).toLocaleString("id-ID")} *(LUNAS)*
+
+⚠️ *Kendala Supplier:*
+${errorMessage || "Saldo Premku tidak mencukupi / stok supplier habis."}
+
+👉 *Tindakan Admin:*
+1. Cek & Top up saldo di Supplier
+2. Buka Admin Panel Nara Store -> Kelola Pesanan #${orderNumber}
+3. Klik tombol *'Proses Ulang ke Supplier'* untuk menerbitkan akun ke pembeli.`;
+
+  try {
+    await sendWhatsAppMessage(adminPhone, message);
+    console.log(`📢 [WhatsApp] Notifikasi darurat berhasil dikirim ke Admin (${adminPhone}) untuk order #${orderNumber}`);
+  } catch (err: any) {
+    console.warn(`⚠️ [WhatsApp] Gagal mengirim notifikasi darurat ke admin:`, err.message);
+  }
+}
+
 // Backward Compatibility Aliases agar kode lama tidak breaking
 export const validateWithFonnte = validateWhatsAppNumber;
 export const sendFonnteMessage = sendWhatsAppMessage;

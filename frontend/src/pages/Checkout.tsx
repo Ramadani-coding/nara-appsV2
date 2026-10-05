@@ -888,7 +888,7 @@ export default function Checkout() {
             <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-400 rounded-xl text-left text-xs font-semibold text-amber-900 dark:text-amber-200 flex items-start gap-2.5">
               <span className="text-base leading-none">💡</span>
               <p className="leading-relaxed text-[11px]">
-                Server STB memproses antrean secara bergantian agar pesanan tidak tabrakan. 
+                Memproses antrean secara bergantian agar pesanan tidak tabrakan. 
                 <strong className="block mt-0.5 font-bold">Harap tidak me-refresh atau menutup tab browser ini.</strong>
               </p>
             </div>

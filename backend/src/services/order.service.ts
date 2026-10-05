@@ -6,7 +6,8 @@ import { midtransService } from "./midtrans.service.js";
 import { premiumkuService } from "./premiumku.service.js";
 import { 
   sendWhatsAppMessage, 
-  sendOrderSuccessNotification 
+  sendOrderSuccessNotification,
+  notifyAdminSupplierFailed 
 } from "./whatsapp.service.js";
 
 const ORDER_SECRET_SALT = process.env.ORDER_SECRET_SALT || "nara-order-security-salt-2026-xyz";
@@ -497,6 +498,14 @@ export class OrderService {
           }
         } else {
           console.warn(`⚠️ API Premiumku mengembalikan status belum sukses: ${premkuRes.message}. Pesanan tetap berstatus 'processing' untuk penanganan admin.`);
+          // Notifikasi darurat instan ke WhatsApp Admin
+          notifyAdminSupplierFailed(
+            order.orderNumber,
+            firstItem?.productName || "Produk Digital",
+            order.customerPhone || "-",
+            order.totalAmount,
+            premkuRes.message || "Saldo Premku tidak mencukupi / stok supplier habis"
+          ).catch((err) => console.warn("⚠️ Gagal kirim notif admin:", err.message));
         }
       } else {
         // Fallback: Jika produk tidak terikat ke providerId tertentu, buat delivery manual / instant placeholder
@@ -533,6 +542,13 @@ export class OrderService {
     } catch (autoOrderErr: any) {
       console.error(`❌ Gagal melakukan auto-order ke Premiumku untuk ${orderNumber}:`, autoOrderErr.message);
       // Pesanan tetap berstatus `paid` sehingga admin dapat menindaklanjuti secara manual
+      notifyAdminSupplierFailed(
+        order.orderNumber,
+        order.items?.[0]?.productName || "Produk Digital",
+        order.customerPhone || "-",
+        order.totalAmount,
+        autoOrderErr.message || "Gagal menghubungi API supplier Premku"
+      ).catch((err) => console.warn("⚠️ Gagal kirim notif admin:", err.message));
     }
 
     const updatedOrder = await db.query.orders.findFirst({
@@ -811,6 +827,209 @@ export class OrderService {
       }
     }
     return order;
+  }
+
+  /**
+   * Memproses ulang pesanan ke supplier Premku secara manual oleh Admin
+   * 100% Aman dari Dobel Order / Dobel Potong Saldo:
+   * - Jika sudah ada invoice, HANYA cek status akun (DILARANG createOrder lagi).
+   * - Jika belum ada invoice, cek saldo Premku dulu, baru createOrder sekali.
+   */
+  async retrySupplierOrder(orderId: number) {
+    const order = await db.query.orders.findFirst({
+      where: eq(orders.id, orderId),
+      with: {
+        items: true,
+        payments: true,
+        deliveries: true,
+      },
+    });
+
+    if (!order) {
+      throw new Error(`Pesanan dengan ID #${orderId} tidak ditemukan.`);
+    }
+
+    if (order.status === "completed") {
+      throw new Error(`Pesanan #${order.orderNumber} sudah berstatus selesai ('completed') dan akun sudah terkirim.`);
+    }
+
+    if (order.status === "cancelled") {
+      throw new Error(`Pesanan #${order.orderNumber} sudah dibatalkan.`);
+    }
+
+    const firstItem = order.items?.[0];
+    if (!firstItem) {
+      throw new Error("Item pesanan tidak ditemukan.");
+    }
+
+    // 1. Cek apakah di deliveries sudah ada akun riil
+    for (const del of order.deliveries || []) {
+      try {
+        const parsed = JSON.parse(del.content);
+        if (Array.isArray(parsed.accounts) && parsed.accounts.length > 0) {
+          await db
+            .update(orders)
+            .set({ status: "completed", completedAt: new Date() })
+            .where(eq(orders.id, order.id));
+          return {
+            success: true,
+            message: "Pesanan sudah memiliki akun aktif dan telah ditandai selesai.",
+            order,
+          };
+        }
+      } catch {}
+    }
+
+    // 2. KONDISI 1: Cek apakah invoice Premku sudah pernah terbit sebelumnya
+    // Jika SUDAH ADA invoice, DILARANG buat order baru (anti dobel potong saldo!). Cukup sinkronkan statusnya!
+    let existingInvoice: string | null = null;
+    for (const del of order.deliveries || []) {
+      try {
+        const parsed = JSON.parse(del.content);
+        if (parsed.invoice) {
+          existingInvoice = parsed.invoice;
+          break;
+        }
+      } catch {}
+      if (!existingInvoice) {
+        const match = del.content.match(/API-[0-9a-zA-Z-]+/);
+        if (match) existingInvoice = match[0];
+      }
+    }
+
+    if (existingInvoice) {
+      console.log(`ℹ️ [RetryProvider] Pesanan #${order.orderNumber} sudah memiliki invoice ${existingInvoice}. Menyinkronkan status tanpa order baru...`);
+      await this.syncDeliveryAccountsIfPending(order);
+      const refreshed = await db.query.orders.findFirst({
+        where: eq(orders.id, order.id),
+        with: { items: true, payments: true, deliveries: true },
+      });
+      return {
+        success: true,
+        message: `Status berhasil diperiksa dari invoice supplier (${existingInvoice}).`,
+        order: refreshed,
+      };
+    }
+
+    // 3. KONDISI 2: Order belum pernah berhasil dibuat ke Premku (saldo kemarin kurang).
+    let providerServiceId: string | null = null;
+    if (firstItem.productId) {
+      const prod = await db.query.products.findFirst({
+        where: eq(products.id, firstItem.productId),
+      });
+      providerServiceId = prod?.providerServiceId || null;
+    }
+
+    if (!providerServiceId || isNaN(Number(providerServiceId))) {
+      throw new Error("Produk ini tidak terikat ke provider Premku (Bukan produk otomatis supplier).");
+    }
+
+    // CEK SALDO PREMKU DULU SEBELUM TEMBAK ORDER!
+    const profile = await premiumkuService.getProfile();
+    const currentSaldo = Number(profile.data?.saldo || 0);
+    if (currentSaldo <= 0) {
+      throw new Error(`Saldo akun Premku Anda saat ini Rp0. Silakan lakukan deposit saldo terlebih dahulu di https://premku.com sebelum memproses ulang.`);
+    }
+
+    console.log(`🚀 [RetryProvider] Memproses pesanan #${order.orderNumber} ke Premku (Service ID: ${providerServiceId}, Saldo: Rp${currentSaldo.toLocaleString("id-ID")})...`);
+
+    const refId = order.refId || `REF-${order.orderNumber}-${Date.now().toString().slice(-4)}`;
+
+    const premkuRes = await premiumkuService.createOrder({
+      productId: Number(providerServiceId),
+      qty: firstItem.quantity,
+      refId,
+    });
+
+    console.log(`📦 [RetryProvider] Respon Premku:`, premkuRes);
+
+    if (!premkuRes.success) {
+      throw new Error(premkuRes.message || "Supplier Premku menolak pesanan. Pastikan saldo Premku mencukupi harga modal.");
+    }
+
+    const now = new Date();
+    let deliveryContent = "";
+    let premkuAccounts: any[] = [];
+
+    if (premkuRes.invoice) {
+      for (let attempt = 1; attempt <= 4; attempt++) {
+        try {
+          const statusRes = await premiumkuService.checkOrderStatus(premkuRes.invoice);
+          if (statusRes.success && Array.isArray(statusRes.accounts) && statusRes.accounts.length > 0) {
+            premkuAccounts = statusRes.accounts;
+            break;
+          }
+        } catch {}
+        if (attempt < 4) await new Promise((r) => setTimeout(r, 1200));
+      }
+    }
+
+    const clientUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+
+    if (premkuAccounts.length > 0) {
+      deliveryContent = JSON.stringify({
+        invoice: premkuRes.invoice,
+        accounts: premkuAccounts,
+      });
+
+      await db.insert(deliveries).values({
+        orderId: order.id,
+        productName: firstItem.productName,
+        content: deliveryContent,
+        status: "delivered",
+        deliveredAt: now,
+      });
+
+      await db
+        .update(orders)
+        .set({ status: "completed", completedAt: now })
+        .where(eq(orders.id, order.id));
+
+      this.notifyDiscordBotIfConfigured(order.id, order.orderNumber, order.discordUserId);
+
+      if (order.customerPhone && !order.customerPhone.startsWith("discord:")) {
+        sendOrderSuccessNotification(
+          order.customerPhone,
+          order.orderNumber,
+          firstItem.productName,
+          order.totalAmount,
+          clientUrl
+        ).catch(() => {});
+      }
+    } else {
+      deliveryContent = JSON.stringify({
+        invoice: premkuRes.invoice,
+        status: "processing",
+        message: "Akun sedang dipersiapkan oleh supplier",
+        accounts: [],
+      });
+
+      await db.insert(deliveries).values({
+        orderId: order.id,
+        productName: firstItem.productName,
+        content: deliveryContent,
+        status: "processing",
+        deliveredAt: now,
+      });
+
+      await db
+        .update(orders)
+        .set({ status: "processing" })
+        .where(eq(orders.id, order.id));
+    }
+
+    const updated = await db.query.orders.findFirst({
+      where: eq(orders.id, order.id),
+      with: { items: true, payments: true, deliveries: true },
+    });
+
+    return {
+      success: true,
+      message: premkuAccounts.length > 0 
+        ? "Pesanan berhasil diproses ulang dan akun digital langsung terbit!" 
+        : `Pesanan berhasil dikirim ke Premku (Invoice: ${premkuRes.invoice}). Supplier sedang memproses akun.`,
+      order: updated,
+    };
   }
 
   /**

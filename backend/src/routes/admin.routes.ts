@@ -565,6 +565,36 @@ router.post("/orders/:id/sync-provider", async (req: Request, res: Response) => 
 });
 
 /**
+ * POST /api/admin/orders/:id/retry-provider
+ * Memproses ulang pemesanan ke provider (Premku) jika sebelumnya tertunda / saldo habis
+ */
+router.post("/orders/:id/retry-provider", async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      res.status(400).json({ success: false, message: "ID pesanan tidak valid" });
+      return;
+    }
+
+    const result = await orderService.retrySupplierOrder(id);
+
+    if (!result.success) {
+      res.status(400).json(result);
+      return;
+    }
+
+    res.json(result);
+  } catch (error: any) {
+    console.error("Error retrying supplier order:", error);
+    res.status(500).json({
+      success: false,
+      message: "Gagal memproses ulang pesanan ke provider",
+      error: error.message,
+    });
+  }
+});
+
+/**
  * PATCH /api/admin/orders/:id/status
  * Memperbarui status pesanan secara manual oleh admin
  */
