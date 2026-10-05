@@ -295,9 +295,26 @@ export interface QueueTicketResponse {
   queued: boolean;
   message: string;
   data: {
-    ticketId: string;
-    position: number;
-    estimatedWaitSeconds: number;
+    // Jika queued: true (masuk antrean)
+    ticketId?: string;
+    position?: number;
+    estimatedWaitSeconds?: number;
+    // Jika queued: false (langsung diproses tanpa antrean)
+    orderId?: number;
+    orderNumber?: string;
+    totalAmount?: number;
+    accessToken?: string;
+    refId?: string;
+    status?: string;
+    payment?: {
+      id?: number;
+      transactionId?: string;
+      paymentMethod: string;
+      qrCodeUrl?: string | null;
+      qrString?: string | null;
+      expiryTime?: string | null;
+      status: string;
+    };
   };
 }
 
@@ -315,7 +332,7 @@ export interface QueueTicketStatusResponse {
 }
 
 /**
- * Memasukkan pesanan ke sistem antrean (Queue / Ruang Tunggu Asinkron)
+ * Memasukkan pesanan ke sistem checkout cerdas (Direct jika sepi, Queue jika ada lonjakan)
  */
 export async function enqueueBackendOrder(payload: CreateOrderPayload): Promise<QueueTicketResponse> {
   const res = await fetch(`${API_BASE_URL}/orders/checkout-queue`, {
@@ -330,6 +347,14 @@ export async function enqueueBackendOrder(payload: CreateOrderPayload): Promise<
   const json = await res.json();
   if (!res.ok || !json.success) {
     throw new Error(json.message || "Gagal memasukkan pesanan ke antrean");
+  }
+
+  // Simpan token akses ke sessionStorage jika diproses langsung (queued: false)
+  if (json.data?.orderNumber && json.data?.accessToken) {
+    try {
+      sessionStorage.setItem(`nara_session_token_${json.data.orderNumber}`, json.data.accessToken);
+      localStorage.removeItem(`nara_token_${json.data.orderNumber}`);
+    } catch {}
   }
 
   return json;

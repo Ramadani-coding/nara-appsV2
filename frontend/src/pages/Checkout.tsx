@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useLiveService } from '../lib/useLiveCatalog';
 import { usePremkuBalance } from '../lib/usePremkuBalance';
 import { 
   ArrowLeft, 
+  ArrowRight,
   ShieldCheck, 
   QrCode, 
   Plus, 
@@ -18,7 +19,7 @@ import {
   Users
 } from 'lucide-react';
 import { AppLogo } from '../components/AppLogo';
-import { createBackendOrder, enqueueBackendOrder, getQueueTicketStatus } from '../lib/api';
+import { enqueueBackendOrder, getQueueTicketStatus } from '../lib/api';
 import { 
   validatePhoneLocal, 
   validatePhoneWithBackend, 
@@ -91,64 +92,76 @@ export default function Checkout() {
     estimatedWaitSeconds: number;
     status: 'waiting' | 'processing' | 'completed' | 'failed';
     errorMessage?: string;
+    result?: any;
   }
   const [queueState, setQueueState] = useState<QueueState | null>(null);
+  const hasNavigatedRef = useRef(false);
 
-  // Polling status antrean otomatis setiap 1.5 detik
+  // Polling status antrean otomatis setiap 1.2 detik
   useEffect(() => {
-    if (!queueState || queueState.status === 'completed' || queueState.status === 'failed') {
+    if (!queueState?.ticketId || queueState.status === 'completed' || queueState.status === 'failed') {
       return;
     }
 
-    let isMounted = true;
+    let isCancelled = false;
+
     const interval = setInterval(async () => {
       try {
         const statusRes = await getQueueTicketStatus(queueState.ticketId);
-        if (!isMounted) return;
+        if (isCancelled || hasNavigatedRef.current) return;
 
         if (statusRes.success && statusRes.data) {
           const current = statusRes.data;
-          setQueueState((prev) => (prev ? {
-            ...prev,
-            status: current.status,
-            position: current.position,
-            estimatedWaitSeconds: current.estimatedWaitSeconds,
-          } : null));
 
           if (current.status === 'completed' && current.result?.orderNumber) {
+            hasNavigatedRef.current = true;
             clearInterval(interval);
+
             const resData = current.result;
             const productNameWithQty = quantity > 1 
               ? `${selectedPackage?.name} (${quantity}x)` 
               : selectedPackage?.name;
             const expiryParam = resData.payment?.expiryTime ? `&expiry=${encodeURIComponent(resData.payment.expiryTime)}` : '';
 
-            // Delay 600ms agar user melihat badge sukses sebelum redirect
-            setTimeout(() => {
-              if (!isMounted) return;
-              navigate(
-                `/payment/${resData.orderNumber}?amount=${resData.totalAmount}&product=${encodeURIComponent(
-                  productNameWithQty || 'Produk'
-                )}&phone=${encodeURIComponent(phone.trim())}&email=${encodeURIComponent(
-                  email.trim()
-                )}&qty=${quantity}${expiryParam}`,
-                { state: { orderData: resData } }
-              );
-            }, 600);
+            // Update state dengan result lengkap
+            setQueueState({
+              ticketId: queueState.ticketId,
+              status: 'completed',
+              position: 0,
+              estimatedWaitSeconds: 0,
+              result: resData,
+            });
+
+            // Langsung eksekusi navigasi ke QRIS tanpa delay setTimeout yang rentan ter-cancel!
+            navigate(
+              `/payment/${resData.orderNumber}?amount=${resData.totalAmount}&product=${encodeURIComponent(
+                productNameWithQty || 'Produk'
+              )}&phone=${encodeURIComponent(phone.trim())}&email=${encodeURIComponent(
+                email.trim()
+              )}&qty=${quantity}${expiryParam}`,
+              { state: { orderData: resData }, replace: true }
+            );
           } else if (current.status === 'failed') {
             clearInterval(interval);
             setSubmitError(current.errorMessage || 'Gagal memproses pesanan di antrean.');
             setQueueState(null);
             setIsSubmitting(false);
+          } else {
+            setQueueState((prev) => (prev ? {
+              ...prev,
+              status: current.status,
+              position: current.position,
+              estimatedWaitSeconds: current.estimatedWaitSeconds,
+            } : null));
           }
         }
       } catch (err: any) {
         console.warn('Gagal polling antrean:', err.message);
       }
-    }, 1500);
+    }, 1200);
 
     return () => {
-      isMounted = false;
+      isCancelled = true;
       clearInterval(interval);
     };
   }, [queueState?.ticketId, queueState?.status, quantity, selectedPackage?.name, phone, email, navigate]);
@@ -288,34 +301,39 @@ export default function Checkout() {
         customerEmail: email.trim() || undefined,
       };
 
-      // 1. Masukkan ke antrean BullMQ (Fast Ingest < 20ms)
+      // 1. Panggil API Checkout (Cerdas: Direct jika sepi, Queue jika ada lonjakan)
       const res = await enqueueBackendOrder(orderPayload);
 
+      // KASUS A: Masuk antrean karena ada lonjakan pembeli lain
       if (res.success && res.queued && res.data?.ticketId) {
-        // Masuk ke antrean: buka modal Ruang Tunggu Antrean
+        hasNavigatedRef.current = false;
         setQueueState({
           ticketId: res.data.ticketId,
           position: res.data.position || 1,
           estimatedWaitSeconds: res.data.estimatedWaitSeconds || 3,
           status: 'waiting',
         });
-      } else {
-        // 2. Fallback darurat jika Redis offline
-        const directRes = await createBackendOrder(orderPayload);
-        if (directRes.success && directRes.data.orderNumber) {
-          const expiryParam = directRes.data.payment?.expiryTime ? `&expiry=${encodeURIComponent(directRes.data.payment.expiryTime)}` : '';
+        return;
+      }
+
+      // KASUS B: Diproses langsung tanpa antrean (hanya 1 pembeli / server senggang)
+      if (res.success && (!res.queued || res.data?.orderNumber)) {
+        const orderData = res.data;
+        if (orderData?.orderNumber) {
+          const expiryParam = orderData.payment?.expiryTime ? `&expiry=${encodeURIComponent(orderData.payment.expiryTime)}` : '';
           navigate(
-            `/payment/${directRes.data.orderNumber}?amount=${directRes.data.totalAmount}&product=${encodeURIComponent(
+            `/payment/${orderData.orderNumber}?amount=${orderData.totalAmount}&product=${encodeURIComponent(
               productNameWithQty
             )}&phone=${encodeURIComponent(phone.trim())}&email=${encodeURIComponent(
               email.trim()
             )}&qty=${quantity}${expiryParam}`,
-            { state: { orderData: directRes.data } }
+            { state: { orderData } }
           );
-        } else {
-          throw new Error(directRes.message || 'Gagal membuat pesanan QRIS');
+          return;
         }
       }
+
+      throw new Error(res.message || 'Gagal memproses pesanan QRIS');
     } catch (err: any) {
       console.error('Error saat membuat pesanan:', err);
       setSubmitError(err.message || 'Terjadi kendala saat menghubungi server pembayaran. Silakan coba lagi.');
@@ -839,6 +857,32 @@ export default function Checkout() {
                 </span>
               </div>
             </div>
+
+            {/* Action button if completed (Garansi anti-stuck) */}
+            {queueState.status === 'completed' && queueState.result?.orderNumber && (
+              <button
+                type="button"
+                onClick={() => {
+                  const resData = queueState.result;
+                  const productNameWithQty = quantity > 1 
+                    ? `${selectedPackage?.name} (${quantity}x)` 
+                    : selectedPackage?.name;
+                  const expiryParam = resData.payment?.expiryTime ? `&expiry=${encodeURIComponent(resData.payment.expiryTime)}` : '';
+                  navigate(
+                    `/payment/${resData.orderNumber}?amount=${resData.totalAmount}&product=${encodeURIComponent(
+                      productNameWithQty || 'Produk'
+                    )}&phone=${encodeURIComponent(phone.trim())}&email=${encodeURIComponent(
+                      email.trim()
+                    )}&qty=${quantity}${expiryParam}`,
+                    { state: { orderData: resData }, replace: true }
+                  );
+                }}
+                className="w-full py-3.5 bg-emerald-500 hover:bg-emerald-600 text-black font-black text-xs uppercase tracking-wider border-2 border-black rounded-xl shadow-[3px_3px_0px_#000] neo-btn cursor-pointer flex items-center justify-center gap-2"
+              >
+                <span>LANJUT KE PEMBAYARAN SEKARANG</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            )}
 
             {/* Important Info Note */}
             <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-400 rounded-xl text-left text-xs font-semibold text-amber-900 dark:text-amber-200 flex items-start gap-2.5">
