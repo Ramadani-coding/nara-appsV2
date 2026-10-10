@@ -158,6 +158,8 @@ router.post("/checkout-queue", createOrderLimiter, async (req: Request, res: Res
       customerPhone,
       customerEmail,
       discordUserId,
+      voucherId,
+      voucherCode,
     } = req.body;
 
     if (!customerPhone || !String(customerPhone).trim()) {
@@ -186,6 +188,8 @@ router.post("/checkout-queue", createOrderLimiter, async (req: Request, res: Res
       customerPhone: phoneCheck.normalizedPhone || String(customerPhone).trim(),
       customerEmail: customerEmail ? String(customerEmail).trim() : undefined,
       discordUserId: discordUserId ? String(discordUserId).trim() : undefined,
+      voucherId: voucherId ? Number(voucherId) : undefined,
+      voucherCode: voucherCode ? String(voucherCode).trim() : undefined,
     };
 
     // Cek apakah antrean sistem aktif (Redis atau In-Memory lokal)
@@ -294,6 +298,8 @@ router.post("/", createOrderLimiter, async (req: Request, res: Response) => {
       quantity,
       customerPhone,
       customerEmail,
+      voucherId,
+      voucherCode,
     } = req.body;
 
     if (!customerPhone || !String(customerPhone).trim()) {
@@ -322,6 +328,8 @@ router.post("/", createOrderLimiter, async (req: Request, res: Response) => {
       quantity: Number(quantity) || 1,
       customerPhone: phoneCheck.normalizedPhone || String(customerPhone).trim(),
       customerEmail: customerEmail ? String(customerEmail).trim() : undefined,
+      voucherId: voucherId ? Number(voucherId) : undefined,
+      voucherCode: voucherCode ? String(voucherCode).trim() : undefined,
     });
 
     res.status(201).json({

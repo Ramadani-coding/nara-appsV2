@@ -4,6 +4,7 @@ import {
   LayoutDashboard, 
   ShoppingBag, 
   Tag, 
+  Ticket,
   BarChart3, 
   LogOut, 
   ExternalLink, 
@@ -84,6 +85,7 @@ export const AdminLayout: React.FC = () => {
     { label: "Dashboard", path: "/admin", icon: LayoutDashboard, exact: true },
     { label: "Kelola Pesanan", path: "/admin/orders", icon: ShoppingBag },
     { label: "Produk & Margin", path: "/admin/products", icon: Tag },
+    { label: "Voucher Promo", path: "/admin/vouchers", icon: Ticket },
     { label: "Statistik & Laporan", path: "/admin/analytics", icon: BarChart3 },
     { label: "Profil & Keamanan", path: "/admin/profile", icon: ShieldCheck },
   ];

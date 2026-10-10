@@ -50,6 +50,30 @@ export const products = pgTable("products", {
 ]);
 
 // -----------------------------------------------------------------------------
+// 2.5 VOUCHERS TABLE
+// -----------------------------------------------------------------------------
+export const vouchers = pgTable("vouchers", {
+  id: serial("id").primaryKey(),
+  code: varchar("code", { length: 50 }).notNull().unique(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  discountPercent: integer("discount_percent").notNull(),
+  maxDiscountAmount: integer("max_discount_amount"),
+  minPurchaseAmount: integer("min_purchase_amount").notNull().default(0),
+  maxUsage: integer("max_usage").notNull().default(100),
+  usedCount: integer("used_count").notNull().default(0),
+  startDate: timestamp("start_date", { withTimezone: true }).notNull().defaultNow(),
+  endDate: timestamp("end_date", { withTimezone: true }).notNull(),
+  minMarginProtection: integer("min_margin_protection").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("vouchers_code_idx").on(table.code),
+  index("vouchers_is_active_idx").on(table.isActive),
+]);
+
+// -----------------------------------------------------------------------------
 // 3. ORDERS TABLE
 // -----------------------------------------------------------------------------
 export const orders = pgTable("orders", {
@@ -60,6 +84,9 @@ export const orders = pgTable("orders", {
   customerEmail: varchar("customer_email", { length: 255 }),
   status: varchar("status", { length: 50 }).notNull().default("waiting_payment"),
   totalAmount: integer("total_amount").notNull(),
+  voucherId: integer("voucher_id").references(() => vouchers.id, { onDelete: "set null" }),
+  voucherCode: varchar("voucher_code", { length: 50 }),
+  discountAmount: integer("discount_amount").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   paidAt: timestamp("paid_at", { withTimezone: true }),
   completedAt: timestamp("completed_at", { withTimezone: true }),
@@ -71,6 +98,7 @@ export const orders = pgTable("orders", {
   index("orders_customer_phone_idx").on(table.customerPhone),
   index("orders_status_idx").on(table.status),
   index("orders_discord_user_id_idx").on(table.discordUserId),
+  index("orders_voucher_id_idx").on(table.voucherId),
 ]);
 
 // -----------------------------------------------------------------------------
@@ -152,10 +180,18 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   orderItems: many(orderItems),
 }));
 
-export const ordersRelations = relations(orders, ({ many }) => ({
+export const vouchersRelations = relations(vouchers, ({ many }) => ({
+  orders: many(orders),
+}));
+
+export const ordersRelations = relations(orders, ({ one, many }) => ({
   items: many(orderItems),
   payments: many(payments),
   deliveries: many(deliveries),
+  voucher: one(vouchers, {
+    fields: [orders.voucherId],
+    references: [vouchers.id],
+  }),
 }));
 
 export const orderItemsRelations = relations(orderItems, ({ one }) => ({
@@ -191,6 +227,9 @@ export type NewProductCategory = InferInsertModel<typeof productCategories>;
 
 export type Product = InferSelectModel<typeof products>;
 export type NewProduct = InferInsertModel<typeof products>;
+
+export type Voucher = InferSelectModel<typeof vouchers>;
+export type NewVoucher = InferInsertModel<typeof vouchers>;
 
 export type Order = InferSelectModel<typeof orders>;
 export type NewOrder = InferInsertModel<typeof orders>;

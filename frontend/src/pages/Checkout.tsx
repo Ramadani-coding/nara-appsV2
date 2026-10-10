@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useLiveService } from '../lib/useLiveCatalog';
 import { usePremkuBalance } from '../lib/usePremkuBalance';
+import { supabase } from '../lib/supabaseClient';
 import { 
   ArrowLeft, 
   ArrowRight,
@@ -16,10 +17,14 @@ import {
   AlertTriangle,
   Clock,
   Loader2,
-  Users
+  Users,
+  Ticket,
+  ChevronRight,
+  X,
+  Percent
 } from 'lucide-react';
 import { AppLogo } from '../components/AppLogo';
-import { enqueueBackendOrder, getQueueTicketStatus } from '../lib/api';
+import { enqueueBackendOrder, getQueueTicketStatus, fetchAvailableVouchers, type AvailableVoucher } from '../lib/api';
 import { 
   validatePhoneLocal, 
   validatePhoneWithBackend, 
@@ -84,6 +89,183 @@ export default function Checkout() {
   const [quantity, setQuantity] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Status Voucher Promo yang Dikonfigurasi Admin
+  const [availableVouchers, setAvailableVouchers] = useState<AvailableVoucher[]>([]);
+  const [selectedVoucher, setSelectedVoucher] = useState<AvailableVoucher | null>(null);
+  const [isLoadingVouchers, setIsLoadingVouchers] = useState(false);
+  const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
+
+  const [voucherRealtimeAlert, setVoucherRealtimeAlert] = useState<{
+    message: string;
+    type: 'info' | 'warning' | 'success';
+  } | null>(null);
+
+  // Auto-dismiss alert realtime setelah 7 detik
+  useEffect(() => {
+    if (!voucherRealtimeAlert) return;
+    const t = setTimeout(() => {
+      setVoucherRealtimeAlert(null);
+    }, 7000);
+    return () => clearTimeout(t);
+  }, [voucherRealtimeAlert]);
+
+  // Sinkronisasi Realtime Voucher Promo (Supabase WebSocket, BroadcastChannel, Tab Focus, & Fallback Polling)
+  useEffect(() => {
+    if (!selectedPackage) return;
+    let isCancelled = false;
+
+    const syncVouchers = async (isSilent = false) => {
+      if (!selectedPackage) return;
+      if (!isSilent) setIsLoadingVouchers(true);
+
+      const effProductId = selectedPackage.productId || 
+        (typeof selectedPackage.id === 'number' ? selectedPackage.id : undefined) ||
+        (selectedPackage.providerId && !isNaN(Number(selectedPackage.providerId)) ? Number(selectedPackage.providerId) : undefined);
+
+      try {
+        const data = await fetchAvailableVouchers(effProductId, quantity, {
+          providerId: selectedPackage.providerId,
+          packageId: selectedPackage.id,
+          price: selectedPackage.price,
+          providerPrice: selectedPackage.providerPrice,
+        });
+
+        if (isCancelled) return;
+
+        setAvailableVouchers(data);
+
+        // Evaluasi dan sinkronkan voucher yang sedang dipilih secara realtime
+        setSelectedVoucher((currentVoucher) => {
+          if (!currentVoucher) return null;
+
+          const currentTotal = selectedPackage.price * quantity;
+          const matched = data.find((v) => v.id === currentVoucher.id);
+
+          // Kasus 1: Voucher telah dihapus oleh admin
+          if (!matched) {
+            setVoucherRealtimeAlert({
+              message: `Voucher promo "${currentVoucher.code}" baru saja ditarik atau dihapus oleh admin. Total pembayaran telah disesuaikan.`,
+              type: 'warning',
+            });
+            return null;
+          }
+
+          // Kasus 2: Voucher dinonaktifkan oleh admin
+          if (!matched.isActive) {
+            setVoucherRealtimeAlert({
+              message: `Voucher "${matched.code}" telah dinonaktifkan oleh admin. Total pembayaran telah disesuaikan.`,
+              type: 'warning',
+            });
+            return null;
+          }
+
+          // Kasus 3: Kuota pemakaian voucher habis
+          if (matched.remainingUsage <= 0) {
+            setVoucherRealtimeAlert({
+              message: `Kuota voucher "${matched.code}" baru saja habis digunakan pembeli lain.`,
+              type: 'warning',
+            });
+            return null;
+          }
+
+          // Kasus 4: Periode voucher kadaluarsa
+          const now = new Date();
+          if (now > new Date(matched.endDate) || now < new Date(matched.startDate)) {
+            setVoucherRealtimeAlert({
+              message: `Masa berlaku voucher "${matched.code}" telah berakhir.`,
+              type: 'warning',
+            });
+            return null;
+          }
+
+          // Hitung ulang nominal diskon jika admin mengubah diskon %, plafon rupiah, atau margin
+          const nominalDiscount = Math.round((currentTotal * matched.discountPercent) / 100);
+          const maxCap = matched.maxDiscountAmount && matched.maxDiscountAmount > 0 ? matched.maxDiscountAmount : Infinity;
+          const estimatedDiscount = Math.min(nominalDiscount, maxCap);
+          const newEffectiveDiscount = matched.effectiveDiscount > 0 ? matched.effectiveDiscount : estimatedDiscount;
+
+          if (newEffectiveDiscount !== currentVoucher.effectiveDiscount) {
+            setVoucherRealtimeAlert({
+              message: `Diskon voucher "${matched.code}" otomatis disesuaikan secara realtime menjadi Rp ${newEffectiveDiscount.toLocaleString('id-ID')}.`,
+              type: 'success',
+            });
+          }
+
+          return {
+            ...matched,
+            effectiveDiscount: newEffectiveDiscount,
+          };
+        });
+      } catch (err) {
+        console.warn("Gagal sinkronisasi voucher realtime:", err);
+      } finally {
+        if (!isCancelled && !isSilent) {
+          setIsLoadingVouchers(false);
+        }
+      }
+    };
+
+    // 1. Sinkronisasi awal
+    syncVouchers(false);
+
+    // 2. Hubungkan ke Supabase Realtime WebSocket (Tabel 'vouchers')
+    const channel = supabase
+      .channel(`realtime:checkout:vouchers:${selectedPackage.id || 'current'}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'vouchers' },
+        (payload) => {
+          console.log('⚡ [Realtime Checkout] Update voucher dari Supabase:', payload.eventType);
+          syncVouchers(true);
+        }
+      )
+      .subscribe((status) => {
+        console.log('⚡ [Realtime Checkout] WebSocket status:', status);
+      });
+
+    // 3. BroadcastChannel (Sinkronisasi seketika antar-tab browser lokal <10ms)
+    let bc: BroadcastChannel | null = null;
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        bc = new BroadcastChannel('nara_voucher_sync');
+        bc.onmessage = (event) => {
+          if (event.data?.type === 'VOUCHER_CHANGED') {
+            console.log('⚡ [Realtime Checkout] Broadcast sync diterima');
+            syncVouchers(true);
+          }
+        };
+      } catch {}
+    }
+
+    // 4. Custom DOM Event (Untuk update dalam 1 window/tab)
+    const onCustomEvent = () => {
+      syncVouchers(true);
+    };
+    window.addEventListener('nara:voucher-updated', onCustomEvent);
+
+    // 5. Visibility Change (Saat user kembali ke tab ini)
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        syncVouchers(true);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    // 6. Polling interval ringan (setiap 5 detik) sebagai jaminan fallback
+    const pollInterval = setInterval(() => {
+      syncVouchers(true);
+    }, 5000);
+
+    return () => {
+      isCancelled = true;
+      channel.unsubscribe();
+      if (bc) bc.close();
+      window.removeEventListener('nara:voucher-updated', onCustomEvent);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      clearInterval(pollInterval);
+    };
+  }, [selectedPackage?.id, selectedPackage?.productId, selectedPackage?.providerId, selectedPackage?.price, quantity]);
 
   // Status antrean checkout (BullMQ Queue Ruang Tunggu)
   interface QueueState {
@@ -257,7 +439,9 @@ export default function Checkout() {
     );
   }
 
-  const totalPrice = selectedPackage.price * quantity;
+  const rawTotalPrice = selectedPackage.price * quantity;
+  const discountAmount = selectedVoucher ? selectedVoucher.effectiveDiscount : 0;
+  const finalPrice = Math.max(0, rawTotalPrice - discountAmount);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -291,14 +475,20 @@ export default function Checkout() {
       : selectedPackage.name;
 
     try {
+      const effProductId = selectedPackage.productId || 
+        (typeof selectedPackage.id === 'number' ? selectedPackage.id : undefined) ||
+        (selectedPackage.providerId && !isNaN(Number(selectedPackage.providerId)) ? Number(selectedPackage.providerId) : undefined);
+
       const orderPayload = {
-        productId: typeof selectedPackage.id === 'number' ? selectedPackage.id : undefined,
+        productId: effProductId,
         packageId: String(selectedPackage.providerId || selectedPackage.id),
         productName: selectedPackage.name,
         price: selectedPackage.price,
         quantity,
         customerPhone: phone.trim(),
         customerEmail: email.trim() || undefined,
+        voucherId: selectedVoucher ? selectedVoucher.id : undefined,
+        voucherCode: selectedVoucher ? selectedVoucher.code : undefined,
       };
 
       // 1. Panggil API Checkout (Cerdas: Direct jika sepi, Queue jika ada lonjakan)
@@ -564,27 +754,173 @@ export default function Checkout() {
           </div>
         </div>
 
+        {/* ========================================================
+            SECTION VOUCHER PROMO (PILIH VOUCHER DARI ADMIN)
+           ======================================================== */}
+        <div className={`pt-2 border-t border-dashed border-gray-300 dark:border-gray-700 ${
+          isOutOfStock || isSelectedPkgMaintenance ? 'opacity-50 pointer-events-none' : ''
+        }`}>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-black dark:text-white">
+              <Ticket className="w-4 h-4 text-brand-pink" />
+              <span>Voucher Diskon Toko</span>
+            </div>
+            {availableVouchers.filter(v => v.isEligible && v.effectiveDiscount > 0).length > 0 && !selectedVoucher && (
+              <span className="text-[10px] font-black px-2 py-0.5 bg-brand-yellow text-black border border-black rounded shadow-[1px_1px_0px_#000]">
+                Tersedia {availableVouchers.filter(v => v.isEligible && v.effectiveDiscount > 0).length} Voucher
+              </span>
+            )}
+          </div>
+
+          {/* Notifikasi Realtime Banner */}
+          <AnimatePresence>
+            {voucherRealtimeAlert && (
+              <motion.div
+                initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                className={`p-2.5 mb-2.5 rounded-xl border-2 flex items-start justify-between gap-2 text-xs font-bold ${
+                  voucherRealtimeAlert.type === 'warning'
+                    ? 'bg-rose-50 dark:bg-rose-950/70 border-rose-400 text-rose-900 dark:text-rose-200 shadow-[2px_2px_0px_#f43f5e]'
+                    : voucherRealtimeAlert.type === 'success'
+                    ? 'bg-emerald-50 dark:bg-emerald-950/70 border-emerald-400 text-emerald-900 dark:text-emerald-200 shadow-[2px_2px_0px_#10b981]'
+                    : 'bg-blue-50 dark:bg-blue-950/70 border-blue-400 text-blue-900 dark:text-blue-200 shadow-[2px_2px_0px_#3b82f6]'
+                }`}
+              >
+                <div className="flex items-start gap-1.5 min-w-0">
+                  <span className="text-sm shrink-0">⚡</span>
+                  <span className="leading-tight">{voucherRealtimeAlert.message}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setVoucherRealtimeAlert(null)}
+                  className="p-0.5 text-gray-500 hover:text-black dark:hover:text-white shrink-0 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {!selectedVoucher ? (
+            /* STATE 1: BELUM MEMILIH VOUCHER -> TOMBOL PILIH VOUCHER */
+            <button
+              type="button"
+              onClick={() => setIsVoucherModalOpen(true)}
+              disabled={isOutOfStock || isSelectedPkgMaintenance}
+              className="w-full p-3.5 bg-[#FAF8F5] dark:bg-[#1E2333] hover:bg-gray-100 dark:hover:bg-[#252b3d] border-2 border-black dark:border-gray-700 rounded-xl shadow-[2px_2px_0px_#000] neo-btn flex items-center justify-between gap-3 text-left transition-all cursor-pointer group"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-brand-pink/20 dark:bg-brand-pink/30 border border-black dark:border-gray-600 flex items-center justify-center shrink-0">
+                  <Percent className="w-4 h-4 text-brand-pink" />
+                </div>
+                <div className="min-w-0">
+                  <span className="font-black text-xs text-black dark:text-white block group-hover:text-brand-blue transition-colors">
+                    Pilih Voucher Diskon
+                  </span>
+                  <span className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold block truncate">
+                    {isLoadingVouchers
+                      ? "Memeriksa voucher aktif..."
+                      : availableVouchers.filter(v => v.isEligible && v.effectiveDiscount > 0).length > 0
+                      ? "Klik untuk memilih voucher potongan harga"
+                      : "Pilih dari voucher aktif toko"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1 px-2.5 py-1 bg-white dark:bg-[#151923] border border-black dark:border-gray-600 rounded-lg text-[10px] font-black uppercase shrink-0 shadow-[1px_1px_0px_#000]">
+                <span>PILIH</span>
+                <ChevronRight className="w-3 h-3" />
+              </div>
+            </button>
+          ) : (
+            /* STATE 2: VOUCHER SUDAH DIPILIH -> TAMPILKAN KARTU VOUCHER */
+            <div className="p-3.5 bg-emerald-50/80 dark:bg-emerald-950/40 border-2 border-emerald-500 rounded-xl space-y-2 shadow-[3px_3px_0px_#000] relative">
+              <div className="flex items-start justify-between gap-2">
+                <div className="space-y-0.5 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-mono font-black text-xs text-emerald-900 dark:text-emerald-200 bg-white dark:bg-[#151923] px-2 py-0.5 rounded border border-emerald-400">
+                      {selectedVoucher.code}
+                    </span>
+                    <span className="text-[10px] font-black px-1.5 py-0.5 bg-emerald-600 text-white rounded">
+                      {selectedVoucher.discountPercent}% OFF
+                    </span>
+                  </div>
+                  <div className="font-black text-xs text-emerald-950 dark:text-emerald-100 truncate">
+                    {selectedVoucher.name}
+                  </div>
+                  <div className="text-[11px] font-extrabold text-emerald-700 dark:text-emerald-300">
+                    Potongan Harga: -Rp {discountAmount.toLocaleString('id-ID')}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsVoucherModalOpen(true)}
+                    className="px-2 py-1 bg-white dark:bg-[#181C2A] text-black dark:text-white border border-black dark:border-gray-700 text-[10px] font-black uppercase rounded neo-btn cursor-pointer"
+                  >
+                    Ganti
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedVoucher(null)}
+                    aria-label="Hapus voucher"
+                    className="p-1 bg-white dark:bg-[#181C2A] text-rose-600 border border-black dark:border-gray-700 text-[10px] font-black rounded neo-btn cursor-pointer"
+                    title="Batalkan Voucher"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Notice jika diskon dibatasi oleh batas margin produk (Anti-Rugi) */}
+              {selectedVoucher.isCappedByMargin && (
+                <div className="pt-1 border-t border-emerald-200 dark:border-emerald-800 flex items-center gap-1 text-[10px] font-bold text-amber-900 dark:text-amber-200">
+                  <ShieldCheck className="w-3 h-3 text-emerald-600 shrink-0" />
+                  <span>Proteksi Margin: Diskon dibatasi maks. Rp {discountAmount.toLocaleString('id-ID')} agar tidak melebihi margin modal produk.</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Total Price Strip */}
-        <div className={`p-3.5 border-2 rounded-xl flex justify-between items-center transition-all ${
+        <div className={`p-3.5 border-2 rounded-xl flex flex-col gap-2 transition-all ${
           isOutOfStock || isSelectedPkgMaintenance
             ? 'opacity-50 bg-gray-100 dark:bg-gray-800 border-gray-400 shadow-none'
             : 'bg-brand-blue-soft/40 dark:bg-brand-blue/10 border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000]'
         }`}>
-          <div className="space-y-0.5">
-            <span className="font-black text-xs uppercase tracking-wide text-gray-700 dark:text-gray-300 block">
-              Total Pembayaran
-            </span>
-            {quantity > 1 && !isOutOfStock && !isSelectedPkgMaintenance && (
-              <span className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold">
-                {quantity}x paket @ Rp {selectedPackage.price.toLocaleString('id-ID')}
+          {selectedVoucher && discountAmount > 0 && (
+            <div className="space-y-1 pb-1.5 border-b border-black/10 dark:border-gray-700 text-xs font-bold">
+              <div className="flex justify-between items-center text-gray-600 dark:text-gray-400">
+                <span>Subtotal ({quantity}x item)</span>
+                <span>Rp {rawTotalPrice.toLocaleString('id-ID')}</span>
+              </div>
+              <div className="flex justify-between items-center text-emerald-700 dark:text-emerald-400 font-black">
+                <span>Diskon Voucher ({selectedVoucher.code})</span>
+                <span>-Rp {discountAmount.toLocaleString('id-ID')}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-between items-center">
+            <div className="space-y-0.5">
+              <span className="font-black text-xs uppercase tracking-wide text-gray-700 dark:text-gray-300 block">
+                Total Pembayaran
               </span>
-            )}
+              {quantity > 1 && !isOutOfStock && !isSelectedPkgMaintenance && !selectedVoucher && (
+                <span className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold">
+                  {quantity}x paket @ Rp {selectedPackage.price.toLocaleString('id-ID')}
+                </span>
+              )}
+            </div>
+            <span className={`text-xl sm:text-2xl font-black ${
+              isOutOfStock || isSelectedPkgMaintenance ? 'text-gray-500' : 'text-brand-blue'
+            }`}>
+              Rp {finalPrice.toLocaleString('id-ID')}
+            </span>
           </div>
-          <span className={`text-xl sm:text-2xl font-black ${
-            isOutOfStock || isSelectedPkgMaintenance ? 'text-gray-500' : 'text-brand-blue'
-          }`}>
-            Rp {totalPrice.toLocaleString('id-ID')}
-          </span>
         </div>
       </div>
 
@@ -893,6 +1229,170 @@ export default function Checkout() {
               </p>
             </div>
           </motion.div>
+        </div>
+      )}
+
+      {/* ========================================================
+          MODAL PILIH VOUCHER PROMO (USER HANYA DAPAT MEMILIH)
+         ======================================================== */}
+      {isVoucherModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="w-full max-w-lg bg-white dark:bg-[#181C2A] border-4 border-black dark:border-gray-600 rounded-2xl shadow-[8px_8px_0px_#000] p-5 sm:p-6 space-y-4 my-8 text-black dark:text-white">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b-2 border-black dark:border-gray-700 pb-3">
+              <div className="flex items-center gap-2">
+                <Ticket className="w-5 h-5 text-brand-pink" />
+                <h3 className="text-base sm:text-lg font-black uppercase tracking-tight">
+                  Pilih Voucher Promo
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsVoucherModalOpen(false)}
+                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* List Vouchers */}
+            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+              {isLoadingVouchers ? (
+                <div className="py-12 text-center space-y-2">
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-brand-blue" />
+                  <p className="text-xs font-bold text-gray-500">Memeriksa voucher yang tersedia...</p>
+                </div>
+              ) : availableVouchers.length === 0 ? (
+                <div className="py-10 text-center space-y-2 p-4 bg-gray-50 dark:bg-gray-800/40 rounded-xl border border-dashed border-gray-300 dark:border-gray-700">
+                  <Ticket className="w-8 h-8 mx-auto text-gray-400" />
+                  <div className="font-black text-sm">Tidak Ada Voucher Tersedia</div>
+                  <p className="text-xs text-gray-500">Saat ini belum ada voucher promo aktif untuk produk ini.</p>
+                </div>
+              ) : (
+                availableVouchers.map((v) => {
+                  const isSelected = selectedVoucher?.id === v.id;
+                  const nominalDiscount = Math.round((rawTotalPrice * v.discountPercent) / 100);
+                  const maxCap = v.maxDiscountAmount && v.maxDiscountAmount > 0 ? v.maxDiscountAmount : Infinity;
+                  const estimatedDiscount = Math.min(nominalDiscount, maxCap);
+                  const effectiveDiscount = v.effectiveDiscount > 0 ? v.effectiveDiscount : estimatedDiscount;
+                  const isEligible = v.isEligible && (v.effectiveDiscount > 0 || rawTotalPrice >= (v.minPurchaseAmount || 0));
+
+                  return (
+                    <div
+                      key={v.id}
+                      className={`p-3.5 sm:p-4 border-2 rounded-xl transition-all relative space-y-2.5 ${
+                        isSelected
+                          ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 shadow-[3px_3px_0px_#10b981]"
+                          : isEligible
+                          ? "bg-[#FAF8F5] dark:bg-[#1E2333] border-black dark:border-gray-700 hover:border-brand-blue shadow-[2px_2px_0px_#000]"
+                          : "bg-gray-100 dark:bg-gray-800/60 border-gray-300 dark:border-gray-700 opacity-60"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="space-y-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono font-black text-xs px-2 py-0.5 bg-white dark:bg-[#151923] border border-black dark:border-gray-600 rounded">
+                              {v.code}
+                            </span>
+                            <span className="px-2 py-0.5 bg-brand-pink text-white text-[10px] font-black uppercase rounded border border-black shadow-[1px_1px_0px_#000]">
+                              {v.discountPercent}% DISKON
+                            </span>
+                          </div>
+                          <h4 className="font-black text-xs sm:text-sm text-black dark:text-white leading-snug">
+                            {v.name}
+                          </h4>
+                          {v.description && (
+                            <p className="text-[11px] text-gray-600 dark:text-gray-400 font-medium">
+                              {v.description}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Potongan nominal */}
+                        {isEligible && effectiveDiscount > 0 ? (
+                          <div className="text-right shrink-0">
+                            <span className="text-[10px] uppercase font-black text-gray-500 block">HEMAT</span>
+                            <span className="font-black text-sm text-emerald-600 dark:text-emerald-400">
+                              -Rp {effectiveDiscount.toLocaleString('id-ID')}
+                            </span>
+                          </div>
+                        ) : null}
+                      </div>
+
+                      {/* Terms & Info Row */}
+                      <div className="pt-2 border-t border-dashed border-gray-300 dark:border-gray-700 flex flex-wrap items-center justify-between gap-2 text-[10px] font-bold text-gray-500 dark:text-gray-400">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span>Sisa Kuota: {v.remainingUsage}x</span>
+                          <span>•</span>
+                          <span>Berlaku s/d {new Date(v.endDate).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })}</span>
+                        </div>
+
+                        {v.isCappedByMargin && isEligible && (
+                          <div className="w-full text-[10px] text-amber-700 dark:text-amber-300 flex items-center gap-1 font-semibold">
+                            <ShieldCheck className="w-3 h-3 text-emerald-600 shrink-0" />
+                            <span>Proteksi Margin: Diskon disesuaikan ke batas aman Rp {effectiveDiscount.toLocaleString('id-ID')}.</span>
+                          </div>
+                        )}
+
+                        {!isEligible && (
+                          <div className="w-full text-[10px] text-rose-600 dark:text-rose-400 flex items-center gap-1 font-bold">
+                            <AlertTriangle className="w-3 h-3 shrink-0" />
+                            <span>{v.ineligibilityReason || "Tidak memenuhi syarat untuk pesanan ini"}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Action Button */}
+                      <div className="pt-1 flex justify-end">
+                        {isSelected ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedVoucher(null);
+                              setIsVoucherModalOpen(false);
+                            }}
+                            className="px-4 py-1.5 bg-rose-50 text-rose-700 border border-rose-400 rounded-lg text-xs font-black uppercase cursor-pointer neo-btn"
+                          >
+                            Batalkan Pilihan
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={!isEligible}
+                            onClick={() => {
+                              setSelectedVoucher({
+                                ...v,
+                                effectiveDiscount,
+                              });
+                              setIsVoucherModalOpen(false);
+                            }}
+                            className={`px-4 py-1.5 rounded-lg text-xs font-black uppercase transition-all cursor-pointer ${
+                              isEligible
+                                ? "bg-brand-blue hover:bg-blue-700 text-white border-2 border-black shadow-[2px_2px_0px_#000] neo-btn"
+                                : "bg-gray-200 dark:bg-gray-800 text-gray-400 border border-gray-400 cursor-not-allowed"
+                            }`}
+                          >
+                            Gunakan Voucher
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="pt-2 border-t-2 border-black dark:border-gray-700 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsVoucherModalOpen(false)}
+                className="px-5 py-2.5 bg-white dark:bg-[#1E2333] text-black dark:text-white font-black text-xs uppercase tracking-wider border-2 border-black dark:border-gray-700 rounded-xl shadow-[2px_2px_0px_#000] cursor-pointer neo-btn"
+              >
+                Selesai
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </motion.div>

@@ -19,11 +19,16 @@ export interface OrderTicketData {
     customerPhone: string;
     customerEmail?: string;
     discordUserId?: string;
+    voucherId?: number;
+    voucherCode?: string;
   };
   result?: {
     orderId: number;
     orderNumber: string;
     totalAmount: number;
+    subtotalAmount?: number;
+    discountAmount?: number;
+    voucherCode?: string | null;
     accessToken?: string;
     refId?: string;
     status?: string;

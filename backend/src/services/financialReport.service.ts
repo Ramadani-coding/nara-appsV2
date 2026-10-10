@@ -210,11 +210,14 @@ export class FinancialReportService {
         }
       }
 
+      // Laba bersih riil pesanan setelah dipotong diskon voucher
+      const effectiveOrderProfit = Math.max(0, (order.totalAmount || 0) - orderCost);
+
       if (isPaidOrCompleted) {
         const orderAmount = order.totalAmount || 0;
         allTimeRevenue += orderAmount;
         allTimeCost += orderCost;
-        allTimeProfit += orderProfit;
+        allTimeProfit += effectiveOrderProfit;
         allTimePaidOrdersCount += 1;
 
         // Akumulasi bulanan
@@ -228,14 +231,14 @@ export class FinancialReportService {
         };
         mStats.revenue += orderAmount;
         mStats.cost += orderCost;
-        mStats.profit += orderProfit;
+        mStats.profit += effectiveOrderProfit;
         mStats.orders += 1;
         monthlyStatsMap.set(orderMonthKey, mStats);
 
         if (matchesPeriod) {
           periodRevenue += orderAmount;
           periodCost += orderCost;
-          periodProfit += orderProfit;
+          periodProfit += effectiveOrderProfit;
           periodPaidOrdersCount += 1;
 
           const paymentMethod = order.payments?.[0]?.paymentMethod || "QRIS";
@@ -243,7 +246,7 @@ export class FinancialReportService {
             order,
             orderRevenue: orderAmount,
             orderCost,
-            orderProfit,
+            orderProfit: effectiveOrderProfit,
             itemsSummary: itemSummaries.join(", ") || "Produk Digital",
             totalQuantity: orderQty || 1,
             paymentMethod: paymentMethod.toUpperCase(),

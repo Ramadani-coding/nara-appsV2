@@ -8,6 +8,7 @@ export interface Category {
 
 export interface ProductPackage {
   id: string;
+  productId?: number;
   providerId?: number | string;
   name: string;
   serviceId: string;

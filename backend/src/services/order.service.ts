@@ -1,9 +1,10 @@
 import crypto from "node:crypto";
 import { db } from "../db/index.js";
-import { orders, orderItems, payments, deliveries, products } from "../db/schema.js";
+import { orders, orderItems, payments, deliveries, products, vouchers } from "../db/schema.js";
 import { eq, desc, sql, and, gte, lt } from "drizzle-orm";
 import { midtransService } from "./midtrans.service.js";
 import { premiumkuService } from "./premiumku.service.js";
+import { voucherService } from "./voucher.service.js";
 import { 
   sendWhatsAppMessage, 
   sendOrderSuccessNotification,
@@ -90,6 +91,8 @@ export interface CreateOrderParams {
   customerPhone?: string;
   customerEmail?: string;
   discordUserId?: string;
+  voucherId?: number;
+  voucherCode?: string;
 }
 
 export function parseMidtransExpiry(rawCallback: any): string | null {
@@ -208,7 +211,85 @@ export class OrderService {
 
     console.log(`🔒 [AtomicReservation] Berhasil reservasi stok ${qty} unit untuk produk #${dbProduct.id} (${productName}). Sisa stok: ${reservedProduct.stockCount}`);
 
-    const totalAmount = unitPrice * qty;
+    // 2.5 VOUCHER DISCOUNT & MARGIN PROTECTION (ANTI-RUGI)
+    let appliedVoucher: any = null;
+    let discountAmount = 0;
+
+    if (params.voucherId || params.voucherCode) {
+      if (params.voucherId) {
+        appliedVoucher = await db.query.vouchers.findFirst({
+          where: eq(vouchers.id, Number(params.voucherId)),
+        });
+      } else if (params.voucherCode) {
+        appliedVoucher = await db.query.vouchers.findFirst({
+          where: eq(vouchers.code, String(params.voucherCode).trim().toUpperCase()),
+        });
+      }
+
+      if (!appliedVoucher) {
+        // Rollback reservasi stok jika voucher invalid
+        await db
+          .update(products)
+          .set({
+            stockCount: sql`${products.stockCount} + ${qty}`,
+            stockStatus: "available",
+            updatedAt: new Date(),
+          })
+          .where(eq(products.id, dbProduct.id))
+          .catch(() => {});
+        throw new Error("Voucher promo yang dipilih tidak ditemukan atau sudah tidak berlaku.");
+      }
+
+      const calc = voucherService.calculateDiscount(appliedVoucher, dbProduct, qty);
+      if (!calc.isEligible || calc.effectiveDiscount <= 0) {
+        await db
+          .update(products)
+          .set({
+            stockCount: sql`${products.stockCount} + ${qty}`,
+            stockStatus: "available",
+            updatedAt: new Date(),
+          })
+          .where(eq(products.id, dbProduct.id))
+          .catch(() => {});
+        throw new Error(calc.ineligibilityReason || "Voucher tidak dapat diterapkan pada pesanan ini.");
+      }
+
+      discountAmount = calc.effectiveDiscount;
+
+      // ATOMIC RESERVATION KUOTA VOUCHER (Pastikan usedCount < maxUsage)
+      const [reservedVoucher] = await db
+        .update(vouchers)
+        .set({
+          usedCount: sql`${vouchers.usedCount} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(vouchers.id, appliedVoucher.id),
+            sql`${vouchers.usedCount} < ${vouchers.maxUsage}`,
+            eq(vouchers.isActive, true)
+          )
+        )
+        .returning({ id: vouchers.id, usedCount: vouchers.usedCount });
+
+      if (!reservedVoucher) {
+        await db
+          .update(products)
+          .set({
+            stockCount: sql`${products.stockCount} + ${qty}`,
+            stockStatus: "available",
+            updatedAt: new Date(),
+          })
+          .where(eq(products.id, dbProduct.id))
+          .catch(() => {});
+        throw new Error("Maaf, kuota pemakaian voucher ini baru saja habis digunakan pembeli lain.");
+      }
+
+      console.log(`🎟️ [VoucherApplied] Voucher ${appliedVoucher.code} berhasil digunakan! Diskon: Rp ${discountAmount.toLocaleString("id-ID")}`);
+    }
+
+    const subtotalAmount = unitPrice * qty;
+    const totalAmount = Math.max(1, subtotalAmount - discountAmount);
 
     // 3. Generate Nomor Order dan Ref ID yang unik
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);
@@ -231,6 +312,9 @@ export class OrderService {
           discordUserId: params.discordUserId?.trim() || null,
           status: "waiting_payment",
           totalAmount,
+          voucherId: appliedVoucher ? appliedVoucher.id : null,
+          voucherCode: appliedVoucher ? appliedVoucher.code : null,
+          discountAmount,
         })
         .returning();
       newOrder = insertedOrder;
@@ -242,23 +326,34 @@ export class OrderService {
         productName,
         price: unitPrice,
         quantity: qty,
-        subtotal: totalAmount,
+        subtotal: subtotalAmount,
       });
 
       // 6. Buat transaksi QRIS di Midtrans Core API
+      const midtransItems = [
+        {
+          id: String(dbProduct?.id || "ITEM-1"),
+          name: productName,
+          price: unitPrice,
+          quantity: qty,
+        },
+      ];
+
+      if (discountAmount > 0 && appliedVoucher) {
+        midtransItems.push({
+          id: `VOUCHER-${appliedVoucher.code}`.slice(0, 50),
+          name: `Diskon: ${appliedVoucher.code}`.slice(0, 50),
+          price: -discountAmount,
+          quantity: 1,
+        });
+      }
+
       qrisCharge = await midtransService.createQrisCharge({
         orderNumber: newOrder.orderNumber,
         grossAmount: totalAmount,
         customerPhone: newOrder.customerPhone || "081200000000",
         customerEmail: newOrder.customerEmail || undefined,
-        items: [
-          {
-            id: String(dbProduct?.id || "ITEM-1"),
-            name: productName,
-            price: unitPrice,
-            quantity: qty,
-          },
-        ],
+        items: midtransItems,
       });
 
       // 7. Simpan transaksi pembayaran ke tabel `payments`
@@ -292,6 +387,22 @@ export class OrderService {
         console.error("⚠️ Gagal rollback reservasi stok:", restoreErr.message);
       }
 
+      // Rollback kuota voucher jika sebelumnya sudah di-reserve
+      if (appliedVoucher) {
+        try {
+          await db
+            .update(vouchers)
+            .set({
+              usedCount: sql`GREATEST(0, ${vouchers.usedCount} - 1)`,
+              updatedAt: new Date(),
+            })
+            .where(eq(vouchers.id, appliedVoucher.id));
+          console.log(`🔄 [InstantRollback] Kuota voucher ${appliedVoucher.code} dikembalikan karena pembuatan order/QRIS gagal.`);
+        } catch (voucherRestoreErr: any) {
+          console.error("⚠️ Gagal rollback reservasi voucher:", voucherRestoreErr.message);
+        }
+      }
+
       if (newOrder?.id) {
         await db
           .update(orders)
@@ -310,6 +421,9 @@ export class OrderService {
       orderNumber: newOrder.orderNumber,
       accessToken,
       refId: newOrder.refId,
+      subtotalAmount,
+      discountAmount,
+      voucherCode: appliedVoucher?.code || null,
       totalAmount: newOrder.totalAmount,
       status: newOrder.status,
       customerPhone: newOrder.customerPhone,

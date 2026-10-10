@@ -181,6 +181,161 @@ export async function adminFetch(endpoint: string, options: RequestInit = {}): P
 }
 
 // -----------------------------------------------------------------------------
+// VOUCHERS API & INTERFACES
+// -----------------------------------------------------------------------------
+
+export interface AvailableVoucher {
+  id: number;
+  code: string;
+  name: string;
+  description?: string | null;
+  discountPercent: number;
+  maxDiscountAmount?: number | null;
+  minPurchaseAmount: number;
+  maxUsage: number;
+  usedCount: number;
+  remainingUsage: number;
+  startDate: string;
+  endDate: string;
+  isEligible: boolean;
+  ineligibilityReason?: string;
+  calculatedDiscount: number;
+  effectiveDiscount: number;
+  isCappedByMargin: boolean;
+  maxAllowedDiscount?: number;
+  isActive?: boolean;
+}
+
+export interface AdminVoucher {
+  id: number;
+  code: string;
+  name: string;
+  description?: string | null;
+  discountPercent: number;
+  maxDiscountAmount?: number | null;
+  minPurchaseAmount: number;
+  maxUsage: number;
+  usedCount: number;
+  startDate: string | Date;
+  endDate: string | Date;
+  minMarginProtection: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Mengambil daftar voucher aktif yang tersedia untuk dipilih di Checkout
+ */
+export async function fetchAvailableVouchers(
+  productId?: number,
+  quantity: number = 1,
+  options?: {
+    providerId?: string | number;
+    packageId?: string;
+    price?: number;
+    providerPrice?: number;
+  }
+): Promise<AvailableVoucher[]> {
+  try {
+    const params = new URLSearchParams();
+    if (productId && !isNaN(productId)) params.append("productId", String(productId));
+    if (quantity && !isNaN(quantity)) params.append("quantity", String(quantity));
+    if (options?.providerId) params.append("providerId", String(options.providerId));
+    if (options?.packageId) params.append("packageId", String(options.packageId));
+    if (options?.price !== undefined && !isNaN(options.price)) params.append("price", String(options.price));
+    if (options?.providerPrice !== undefined && !isNaN(options.providerPrice)) params.append("providerPrice", String(options.providerPrice));
+
+    const queryStr = params.toString() ? `?${params.toString()}` : "";
+    const res = await fetch(`${API_BASE_URL}/vouchers/available${queryStr}`, {
+      headers: { Accept: "application/json" },
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        return json.data;
+      }
+    }
+  } catch (err) {
+    console.warn("⚠️ Gagal mengambil voucher aktif:", err);
+  }
+  return [];
+}
+
+/**
+ * Mengambil seluruh voucher untuk dashboard admin
+ */
+export async function fetchAdminVouchers(): Promise<AdminVoucher[]> {
+  const res = await adminFetch("/admin/vouchers");
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.message || "Gagal mengambil data voucher admin");
+  }
+  return json.data || [];
+}
+
+/**
+ * Membuat voucher baru oleh admin
+ */
+export async function createAdminVoucher(payload: Partial<AdminVoucher>): Promise<AdminVoucher> {
+  const res = await adminFetch("/admin/vouchers", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.message || "Gagal membuat voucher");
+  }
+  return json.data;
+}
+
+/**
+ * Memperbarui pengaturan voucher oleh admin
+ */
+export async function updateAdminVoucher(id: number, payload: Partial<AdminVoucher>): Promise<AdminVoucher> {
+  const res = await adminFetch(`/admin/vouchers/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.message || "Gagal memperbarui voucher");
+  }
+  return json.data;
+}
+
+/**
+ * Menghapus voucher oleh admin
+ */
+export async function deleteAdminVoucher(id: number): Promise<{ success: boolean; message: string }> {
+  const res = await adminFetch(`/admin/vouchers/${id}`, {
+    method: "DELETE",
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.message || "Gagal menghapus voucher");
+  }
+  return json;
+}
+
+/**
+ * Mengubah status aktif/nonaktif voucher
+ */
+export async function toggleAdminVoucherStatus(id: number): Promise<AdminVoucher> {
+  const res = await adminFetch(`/admin/vouchers/${id}/toggle`, {
+    method: "PATCH",
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.message || "Gagal mengubah status voucher");
+  }
+  return json.data;
+}
+
+// -----------------------------------------------------------------------------
 // ORDERS & MIDTRANS QRIS PAYMENT API
 // -----------------------------------------------------------------------------
 
@@ -192,6 +347,8 @@ export interface CreateOrderPayload {
   quantity: number;
   customerPhone: string;
   customerEmail?: string;
+  voucherId?: number;
+  voucherCode?: string;
 }
 
 export interface BackendOrderResponse {
@@ -202,6 +359,9 @@ export interface BackendOrderResponse {
     orderNumber: string;
     refId: string;
     totalAmount: number;
+    subtotalAmount?: number;
+    discountAmount?: number;
+    voucherCode?: string | null;
     status: string;
     customerPhone: string;
     customerEmail?: string;
@@ -229,6 +389,9 @@ export interface BackendOrderDetail {
   customerEmail?: string;
   status: "waiting_payment" | "paid" | "processing" | "completed" | "failed";
   totalAmount: number;
+  voucherId?: number | null;
+  voucherCode?: string | null;
+  discountAmount?: number;
   createdAt: string;
   paidAt?: string;
   completedAt?: string;

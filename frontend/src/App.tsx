@@ -20,6 +20,7 @@ import AdminLogin from "./pages/admin/AdminLogin";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminOrders from "./pages/admin/AdminOrders";
 import AdminProducts from "./pages/admin/AdminProducts";
+import AdminVouchers from "./pages/admin/AdminVouchers";
 import AdminAnalytics from "./pages/admin/AdminAnalytics";
 import AdminProfile from "./pages/admin/AdminProfile";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -57,6 +58,7 @@ function App() {
               <Route index element={<AdminDashboard />} />
               <Route path="orders" element={<AdminOrders />} />
               <Route path="products" element={<AdminProducts />} />
+              <Route path="vouchers" element={<AdminVouchers />} />
               <Route path="analytics" element={<AdminAnalytics />} />
               <Route path="profile" element={<AdminProfile />} />
             </Route>

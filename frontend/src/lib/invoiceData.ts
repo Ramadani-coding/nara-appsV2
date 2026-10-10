@@ -312,13 +312,18 @@ export async function findInvoiceAsync(query: string, options?: FindInvoiceOptio
       const isLocked = Boolean(backendOrder.isLocked);
       const isVerified = Boolean(backendOrder.isVerified);
 
+      const discount = backendOrder.discountAmount || 0;
+      const subtotal = (firstItem?.price || unitPrice) * qtyCount;
+      const discountLabel = backendOrder.voucherCode ? `Voucher Promo (${backendOrder.voucherCode})` : 'Diskon Voucher';
+
       return {
         id: `#${backendOrder.orderNumber}`,
         productName: firstItem?.productName || 'Produk Digital Premium',
         qty: qtyCount,
         unitPrice,
-        subtotal: backendOrder.totalAmount,
-        discount: 0,
+        subtotal: discount > 0 ? subtotal : backendOrder.totalAmount,
+        discount,
+        discountLabel,
         uniqueCode: 0,
         total: backendOrder.totalAmount,
         status: invoiceStatus,

@@ -142,9 +142,11 @@ function createPackageFromRaw(rawItem: any, service: ServiceProduct): ProductPac
     : undefined;
 
   const pkgId = `${service.id}-${provId || rawId}`;
+  const dbProductId = rawItem.id && !isNaN(Number(rawItem.id)) ? Number(rawItem.id) : undefined;
 
   return {
     id: pkgId,
+    productId: dbProductId,
     providerId: provId ? Number(provId) : undefined,
     serviceId: service.id,
     serviceName: service.name,
@@ -298,6 +300,9 @@ class CatalogStore {
       }
       if (originalPrice !== undefined && originalPrice !== null && Number(originalPrice) > 0) {
         foundPackage.originalPrice = Number(originalPrice);
+      }
+      if (rawItem.id && (!foundPackage.productId || foundPackage.productId !== Number(rawItem.id))) {
+        foundPackage.productId = Number(rawItem.id);
       }
       if (description) {
         foundPackage.description = description;

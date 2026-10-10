@@ -1,17 +1,17 @@
 # Graph Report - nara apps v2  (2026-10-10)
 
 ## Corpus Check
-- 309 files · ~279,727 words
+- 312 files · ~288,089 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 21 file(s) not represented in the graph (top: (none) 10, .toml 4, .example 4)
 
 ## Summary
-- 2203 nodes · 2965 edges · 198 communities (130 shown, 68 thin omitted)
-- Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 12 edges (avg confidence: 0.89)
+- 2231 nodes · 3043 edges · 199 communities (129 shown, 70 thin omitted)
+- Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 13 edges (avg confidence: 0.89)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `4fed408b`
+- Built from commit: `e7dc5e48`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -29,11 +29,11 @@
 - Tone & Voice
 - api.ts
 - webhook.routes.ts
-- routes/index.ts
-- Checkout.tsx
+- admin.routes.ts
+- AdminProducts.tsx
 - compilerOptions
 - premiumku.service.ts
-- adminFetch
+- AdminAnalytics.tsx
 - scripts
 - MyOrders.tsx
 - compilerOptions
@@ -49,7 +49,7 @@
 - dependencies
 - ErrorBoundary
 - devDependencies
-- admin.routes.ts
+- Checkout.tsx
 - 6. Database Schema
 - .oxlintrc.json
 - PRD — Project Requirements Document
@@ -58,7 +58,7 @@
 - frontend/tsconfig.json
 - antislop-layoutmobile
 - 6. Database Schema
-- Responsive Design
+- adapt.md
 - impeccable/SKILL.md
 - 🚀 Panduan Deployment Nara Store ke VPS Menggunakan Docker & Docker Compose
 - onboard.md
@@ -88,7 +88,7 @@
 - generate.md
 - Group 2: Purpose-Gate (technique allowed, purpose required)
 - Decorative Elements
-- $impeccable hooks
+- Operate mode depth (and Read notes)
 - critique.md
 - Simplify the Design
 - Hardening Dimensions
@@ -111,8 +111,8 @@
 - Section Definitions
 - Common Cognitive Load Violations
 - iOS platform
-- Operate mode depth (and Read notes)
-- rateLimiter.ts
+- product.routes.ts
+- orderService
 - antislop
 - Part 1: AI Slop Patterns (Warning Signs)
 - App & Dashboard
@@ -130,10 +130,10 @@
 - Impeccable Asset Producer
 - Impeccable Finish Reviewer
 - Impeccable Manual Edit Applier
-- layout.md
+- voucherService
 - The Craftsmanship Standard
 - Supabase Postgres Best Practices
-- Diagnostic Scan
+- Responsive Design
 - Diagnostic Scan
 - bolder.md
 - Visualize: Direction Comps & Asset Production
@@ -212,18 +212,19 @@
 - .claude/skills/supabase-postgres-best-practices/references/security-rls-basics.md
 - .claude/skills/supabase-postgres-best-practices/references/security-rls-performance.md
 - .claude/skills/supabase-postgres-best-practices/references/_template.md
+- react
 
 ## God Nodes (most connected - your core abstractions)
-1. `react` - 32 edges
-2. `lucide-react` - 31 edges
-3. `App()` - 24 edges
+1. `react` - 33 edges
+2. `lucide-react` - 32 edges
+3. `App()` - 25 edges
 4. `orderService` - 22 edges
 5. `react-router-dom` - 22 edges
-6. `drizzle-orm` - 18 edges
-7. `framer-motion` - 18 edges
-8. `compilerOptions` - 18 edges
-9. `Group 1: Hard Gate (absolute, no exceptions)` - 18 edges
-10. `Group 1: Hard Gate (absolute, no exceptions)` - 18 edges
+6. `drizzle-orm` - 19 edges
+7. `db` - 18 edges
+8. `framer-motion` - 18 edges
+9. `adminFetch()` - 18 edges
+10. `compilerOptions` - 18 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `clearTransactions()` --calls--> `sqlClient`  [EXTRACTED]
@@ -232,15 +233,15 @@
   backend/src/scripts/seed-admin.ts → backend/src/db/index.ts
 - `App()` --calls--> `ErrorBoundary`  [EXTRACTED]
   frontend/src/App.tsx → frontend/src/components/ErrorBoundary.tsx
-- `App()` --calls--> `AdminDashboard()`  [EXTRACTED]
-  frontend/src/App.tsx → frontend/src/pages/admin/AdminDashboard.tsx
 - `App()` --calls--> `AdminOrders()`  [EXTRACTED]
   frontend/src/App.tsx → frontend/src/pages/admin/AdminOrders.tsx
+- `App()` --calls--> `AdminProducts()`  [EXTRACTED]
+  frontend/src/App.tsx → frontend/src/pages/admin/AdminProducts.tsx
 
 ## Import Cycles
 - None detected.
 
-## Communities (198 total, 68 thin omitted)
+## Communities (199 total, 70 thin omitted)
 
 ### Community 0 - "handlers.ts"
 Cohesion: 0.09
@@ -251,12 +252,12 @@ Cohesion: 0.04
 Nodes (43): dependencies, clsx, framer-motion, lucide-react, react, react-dom, react-router-dom, @supabase/supabase-js (+35 more)
 
 ### Community 2 - "whatsapp.service.ts"
-Cohesion: 0.10
-Nodes (23): runTest(), orderService, parseMidtransExpiry(), detectIndonesianOperator(), DUMMY_PHONE_PATTERNS, FonnteSendResult, FonnteValidateResult, formatToWhatsAppJid() (+15 more)
+Cohesion: 0.16
+Nodes (21): runTest(), detectIndonesianOperator(), DUMMY_PHONE_PATTERNS, FonnteSendResult, FonnteValidateResult, formatToWhatsAppJid(), getGowaConfig(), INDONESIAN_OPERATORS (+13 more)
 
 ### Community 3 - "App.tsx"
-Cohesion: 0.13
-Nodes (25): App(), PublicLayout(), AdminGuard(), AdminLayout(), Footer(), InstagramIcon(), Navbar(), ScrollToTop() (+17 more)
+Cohesion: 0.12
+Nodes (23): App(), PublicLayout(), AdminGuard(), AdminLayout(), Footer(), InstagramIcon(), Navbar(), ScrollToTop() (+15 more)
 
 ### Community 4 - "orderQueue.ts"
 Cohesion: 0.11
@@ -268,7 +269,7 @@ Nodes (36): contrast_ratio(), linearize(), luminance(), main(), parse_hex(), par
 
 ### Community 6 - "schema.ts"
 Cohesion: 0.08
-Nodes (27): db, deliveries, deliveriesRelations, Delivery, NewDelivery, NewOrder, NewOrderItem, NewPayment (+19 more)
+Nodes (28): deliveriesRelations, Delivery, NewDelivery, NewOrder, NewOrderItem, NewPayment, NewProduct, NewProductCategory (+20 more)
 
 ### Community 7 - "AdminOrders.tsx"
 Cohesion: 0.19
@@ -279,40 +280,40 @@ Cohesion: 0.19
 Nodes (5): CreateQrisChargeParams, MidtransItemDetail, MidtransQrisChargeResponse, midtransService, MidtransStatusResponse
 
 ### Community 9 - "lucide-react"
-Cohesion: 0.14
-Nodes (21): AppLogo(), AppLogoProps, CaraOrderSection(), FAQSection(), HeroOrderSimulator(), HeroOrderSimulatorProps, MockStep, STEPS (+13 more)
+Cohesion: 0.12
+Nodes (23): AppLogo(), AppLogoProps, CaraOrderSection(), FAQSection(), HeroOrderSimulator(), HeroOrderSimulatorProps, MockStep, STEPS (+15 more)
 
 ### Community 10 - "Tone & Voice"
 Cohesion: 0.05
 Nodes (38): Actorless Passive, All-Caps Emphasis, antislop-copywriting, Aphorism Formulas, Boldface Overuse, Chatbot Closers, Copywriting Skill Checklist, Draft, audit, final (+30 more)
 
 ### Community 11 - "api.ts"
-Cohesion: 0.08
-Nodes (25): BackendCategory, BackendOrderDetail, BackendOrderResponse, BackendProduct, checkBackendPaymentStatus(), CreateOrderPayload, fetchLiveProducts(), getBackendOrder() (+17 more)
+Cohesion: 0.10
+Nodes (31): AdminAuthContext, AdminAuthContextType, AdminProfile, adminFetch(), AdminVoucher, BackendCategory, BackendOrderDetail, BackendOrderResponse (+23 more)
 
 ### Community 12 - "webhook.routes.ts"
-Cohesion: 0.18
-Nodes (10): app, ADMIN_PHONE_NUMBER, ADMIN_WHATSAPP_JID, cleanPromoMessage(), containsPromoTag(), isSenderAdmin(), isValidChatOrigin(), PROMO_TAG_REGEX (+2 more)
+Cohesion: 0.17
+Nodes (11): app, ADMIN_PHONE_NUMBER, ADMIN_WHATSAPP_JID, cleanPromoMessage(), containsPromoTag(), isSenderAdmin(), isValidChatOrigin(), PROMO_TAG_REGEX (+3 more)
 
-### Community 13 - "routes/index.ts"
-Cohesion: 0.15
-Nodes (12): productCategories, router, router, apiRouter, router, router, CachedStock, router (+4 more)
+### Community 13 - "admin.routes.ts"
+Cohesion: 0.12
+Nodes (22): users, adminAuthMiddleware(), AuthenticatedAdminRequest, CachedAdminUser, tokenCache, adminAuthLimiter, createOrderLimiter, globalApiLimiter (+14 more)
 
-### Community 14 - "Checkout.tsx"
-Cohesion: 0.18
-Nodes (17): MaintenanceTooltip(), MaintenanceTooltipProps, API_BASE_URL, enqueueBackendOrder(), getQueueTicketStatus(), detectOperator(), DUMMY_PATTERNS, INDONESIAN_OPERATORS (+9 more)
+### Community 14 - "AdminProducts.tsx"
+Cohesion: 0.40
+Nodes (4): broadcastCatalogProductUpdate(), AdminProducts(), Category, Product
 
 ### Community 15 - "compilerOptions"
 Cohesion: 0.10
 Nodes (19): compilerOptions, allowArbitraryExtensions, allowImportingTsExtensions, erasableSyntaxOnly, jsx, lib, module, moduleDetection (+11 more)
 
 ### Community 16 - "premiumku.service.ts"
-Cohesion: 0.12
-Nodes (8): PremiumkuOrderParams, PremiumkuOrderResponse, PremiumkuOrderStatusResponse, PremiumkuProductsResponse, PremiumkuProfile, PremiumkuProfileResponse, premiumkuService, PremiumkuStockResponse
+Cohesion: 0.09
+Nodes (13): financialReportService, formatDateWIB(), formatMonthKeyLabel(), MONTH_NAMES_ID, THEME, PremiumkuOrderParams, PremiumkuOrderResponse, PremiumkuOrderStatusResponse (+5 more)
 
-### Community 17 - "adminFetch"
-Cohesion: 0.14
-Nodes (14): adminFetch(), broadcastCatalogProductUpdate(), AllTimeMetrics, AvailableMonth, MonthlyAverageMetrics, MonthlyBreakdownItem, PeriodMetrics, StatsData (+6 more)
+### Community 17 - "AdminAnalytics.tsx"
+Cohesion: 0.25
+Nodes (7): AllTimeMetrics, AvailableMonth, MonthlyAverageMetrics, MonthlyBreakdownItem, PeriodMetrics, StatsData, TopProduct
 
 ### Community 18 - "scripts"
 Cohesion: 0.12
@@ -327,12 +328,12 @@ Cohesion: 0.12
 Nodes (16): compilerOptions, allowImportingTsExtensions, erasableSyntaxOnly, lib, module, moduleDetection, noEmit, noFallthroughCasesInSwitch (+8 more)
 
 ### Community 21 - "db/index.ts"
-Cohesion: 0.22
-Nodes (7): sqlClient, clearTransactions(), main(), PremiumkuProduct, categorizeProduct(), DEFAULT_CATEGORIES, syncService
+Cohesion: 0.21
+Nodes (6): db, sqlClient, orders, clearTransactions(), main(), drizzle-orm
 
 ### Community 22 - "order.service.ts"
-Cohesion: 0.17
-Nodes (11): checkoutQueue, isQueueActive(), AttemptRecord, router, verificationAttempts, generateOrderToken(), maskEmail(), maskPhoneNumber() (+3 more)
+Cohesion: 0.16
+Nodes (12): deliveries, checkoutQueue, isQueueActive(), AttemptRecord, router, verificationAttempts, generateOrderToken(), maskEmail() (+4 more)
 
 ### Community 23 - "compilerOptions"
 Cohesion: 0.13
@@ -343,7 +344,7 @@ Cohesion: 0.13
 Nodes (14): compilerOptions, esModuleInterop, forceConsistentCasingInFileNames, lib, module, moduleResolution, outDir, resolveJsonModule (+6 more)
 
 ### Community 25 - ".init"
-Cohesion: 0.08
+Cohesion: 0.09
 Nodes (23): Monorepo notes, Opting out of the boot check, Step 1: Run the pass, Step 2: Act by severity, Step 3: Deprecated fields are binding, Step 4: Do not overclaim on truth drift, What this owns, and what it does not, Completion gate (+15 more)
 
 ### Community 26 - "Tone & Voice"
@@ -374,9 +375,9 @@ Nodes (3): ErrorBoundary, Props, State
 Cohesion: 0.25
 Nodes (8): devDependencies, drizzle-kit, tsx, @types/cors, @types/exceljs, @types/express, @types/node, typescript
 
-### Community 33 - "admin.routes.ts"
-Cohesion: 0.20
-Nodes (11): users, adminAuthMiddleware(), AuthenticatedAdminRequest, CachedAdminUser, tokenCache, router, financialReportService, formatDateWIB() (+3 more)
+### Community 33 - "Checkout.tsx"
+Cohesion: 0.21
+Nodes (15): API_BASE_URL, AvailableVoucher, enqueueBackendOrder(), fetchAvailableVouchers(), getQueueTicketStatus(), detectOperator(), DUMMY_PATTERNS, INDONESIAN_OPERATORS (+7 more)
 
 ### Community 34 - "6. Database Schema"
 Cohesion: 0.06
@@ -402,13 +403,13 @@ Nodes (30): 100vh Sections, antislop-layoutmobile, Bottom Nav That Eats Content,
 Cohesion: 0.07
 Nodes (27): 1. Overview, 2. Requirements, 3. Core Features, 4. User Flow, 5. Architecture, 6. Database Schema, 7. Tech Stack, Alur Katalog (Fase 1) (+19 more)
 
-### Community 44 - "Responsive Design"
-Cohesion: 0.08
-Nodes (25): Assess Adaptation Challenge, Breakpoints: Content-Driven, Content Adaptation, Desktop Adaptation (Mobile → Desktop), Detect Input Method, Not Just Screen Size, Email Adaptation (Web → Email), Implement Adaptations, Layout Adaptation Patterns (+17 more)
+### Community 44 - "adapt.md"
+Cohesion: 0.12
+Nodes (15): Assess Adaptation Challenge, Content Adaptation, Desktop Adaptation (Mobile → Desktop), Email Adaptation (Web → Email), Implement Adaptations, Layout Adaptation Techniques, Mobile Adaptation (Desktop → Mobile), Navigation Adaptation (+7 more)
 
 ### Community 45 - "impeccable/SKILL.md"
-Cohesion: 0.13
-Nodes (14): Assess Adaptation Challenge, Implement & Verify, Recommended Actions, Recommended Actions, Craft (deprecated alias), Apply, Live-mode signature params, Set the system (+6 more)
+Cohesion: 0.10
+Nodes (19): Assess Adaptation Challenge, Implement & Verify, Recommended Actions, Craft (deprecated alias), Apply, Live-mode signature params, Set the spatial thesis, Two isolated assessments (+11 more)
 
 ### Community 46 - "🚀 Panduan Deployment Nara Store ke VPS Menggunakan Docker & Docker Compose"
 Cohesion: 0.08
@@ -522,9 +523,9 @@ Nodes (13): Group 2: Purpose-Gate (technique allowed, purpose required), R-01 �
 Cohesion: 0.17
 Nodes (12): AI Capsule Badges, Colored Left Stripe, Decorative Elements, Decorative Status Dot, Emoji as Decoration, Eyebrow Badge Above the Headline, Fake Terminal Window, Generic AI Icons (+4 more)
 
-### Community 74 - "$impeccable hooks"
-Cohesion: 0.17
-Nodes (9): Craft floor, Refuse, Verify, Constraints, Failure modes, Flow, $impeccable hooks, Routing (+1 more)
+### Community 74 - "Operate mode depth (and Read notes)"
+Cohesion: 0.10
+Nodes (18): Craft floor, Refuse, Verify, Constraints, Failure modes, Flow, $impeccable hooks, Routing (+10 more)
 
 ### Community 75 - "critique.md"
 Cohesion: 0.17
@@ -614,13 +615,9 @@ Nodes (9): 1. The Wall of Options, 2. The Memory Bridge, 3. The Hidden Navigatio
 Cohesion: 0.22
 Nodes (9): Color & materials, Components & controls, iOS platform, Layout & structure, Motion, The iOS slop test, Touch targets, Typography (+1 more)
 
-### Community 97 - "Operate mode depth (and Read notes)"
-Cohesion: 0.22
-Nodes (9): Color, Components, Layout, Motion, Operate mode depth (and Read notes), Product constraints, Product permissions, The product slop test (+1 more)
-
-### Community 98 - "rateLimiter.ts"
-Cohesion: 0.33
-Nodes (7): adminAuthLimiter, createOrderLimiter, globalApiLimiter, isWhitelistedRequest(), paymentStatusLimiter, phoneValidationLimiter, express-rate-limit
+### Community 97 - "product.routes.ts"
+Cohesion: 0.17
+Nodes (8): productCategories, CachedStock, router, stockCache, PremiumkuProduct, categorizeProduct(), DEFAULT_CATEGORIES, syncService
 
 ### Community 99 - "antislop"
 Cohesion: 0.25
@@ -667,8 +664,8 @@ Cohesion: 0.25
 Nodes (8): App & Dashboard, Charts Without a Question, Default Dashboard Shell, Filler Activity Feed, Filler Data in Fields and Columns, Generic Table Columns, Placeholder Empty and Loading States, Stat Cards With Invented Numbers
 
 ### Community 110 - "Generate Report"
-Cohesion: 0.29
-Nodes (7): Audit Health Score, Detailed Findings by Severity, Executive Summary, Generate Report, Implementation Integrity Verdict, Patterns & Systemic Issues, Positive Findings
+Cohesion: 0.13
+Nodes (14): 1. Accessibility (A11y), 2. Performance, 3. Theming, 4. Responsive Design, 5. Implementation Integrity (CRITICAL), Audit Health Score, Detailed Findings by Severity, Diagnostic Scan (+6 more)
 
 ### Community 111 - "Generate Report"
 Cohesion: 0.29
@@ -690,10 +687,6 @@ Nodes (6): Checks, in order, Disposition, Impeccable Finish Reviewer, Input Cont
 Cohesion: 0.29
 Nodes (6): Checks, Entry Atomicity, Impeccable Manual Edit Applier, Input Contract, Output Contract, Workflow
 
-### Community 116 - "layout.md"
-Cohesion: 0.29
-Nodes (6): Apply, Live-mode signature params, Set the spatial thesis, Two isolated assessments, Verify, Visitor mode
-
 ### Community 117 - "The Craftsmanship Standard"
 Cohesion: 0.33
 Nodes (6): C-1 — Intentionality, C-2 — Functional Completeness, C-3 — Content-Driven Composition, C-4 — Resilience, C-5 — Evidence Over Claims, The Craftsmanship Standard
@@ -702,9 +695,9 @@ Nodes (6): C-1 — Intentionality, C-2 — Functional Completeness, C-3 — Cont
 Cohesion: 0.33
 Nodes (5): How to Use, References, Rule Categories by Priority, Supabase Postgres Best Practices, When to Apply
 
-### Community 119 - "Diagnostic Scan"
-Cohesion: 0.33
-Nodes (6): 1. Accessibility (A11y), 2. Performance, 3. Theming, 4. Responsive Design, 5. Implementation Integrity (CRITICAL), Diagnostic Scan
+### Community 119 - "Responsive Design"
+Cohesion: 0.20
+Nodes (10): Breakpoints: Content-Driven, Detect Input Method, Not Just Screen Size, Layout Adaptation Patterns, Mobile-First: Write It Right, Picture Element for Art Direction, Responsive Design, Responsive Images: Get It Right, Safe Areas: Handle the Notch (+2 more)
 
 ### Community 120 - "Diagnostic Scan"
 Cohesion: 0.33
@@ -762,16 +755,20 @@ Nodes (4): Design Read (how the dials are set), Levers (how the dials become vis
 Cohesion: 0.50
 Nodes (3): Expanding the Oxlint configuration, React Compiler, React + TypeScript + Vite
 
+### Community 198 - "react"
+Cohesion: 0.25
+Nodes (9): OrderGuideModalProps, LiveSalesToast(), MaintenanceTooltip(), MaintenanceTooltipProps, fetchRecentSales(), usePremkuBalance(), ProductDetail(), framer-motion (+1 more)
+
 ## Knowledge Gaps
 - **21 isolated node(s):** `dotenv`, `@types/cors`, `@types/exceljs`, `@types/express`, `@types/node` (+16 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 1521 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **68 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 1528 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **70 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `fetchLiveProducts()` connect `api.ts` to `.init`?**
-  _High betweenness centrality (0.031) - this node is a cross-community bridge._
+- **Why does `fetchLiveProducts()` connect `lucide-react` to `.init`, `api.ts`?**
+  _High betweenness centrality (0.028) - this node is a cross-community bridge._
 - **What connects `dotenv`, `@types/cors`, `@types/exceljs` to the rest of the system?**
   _21 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `handlers.ts` be split into smaller, more focused modules?**
@@ -780,7 +777,7 @@ _Questions this graph is uniquely positioned to answer:_
   _High betweenness centrality (0.019) - this node is a cross-community bridge._
 - **Should `frontend/package.json` be split into smaller, more focused modules?**
   _Cohesion score 0.04440333024976873 - nodes in this community are weakly interconnected._
-- **Why does `react` connect `App.tsx` to `frontend/package.json`, `AdminOrders.tsx`, `lucide-react`, `api.ts`, `Checkout.tsx`, `adminFetch`, `MyOrders.tsx`, `ErrorBoundary`?**
-  _High betweenness centrality (0.017) - this node is a cross-community bridge._
-- **Should `whatsapp.service.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.09615384615384616 - nodes in this community are weakly interconnected._
+- **Why does `react` connect `react` to `frontend/package.json`, `Checkout.tsx`, `App.tsx`, `AdminOrders.tsx`, `lucide-react`, `api.ts`, `AdminProducts.tsx`, `AdminAnalytics.tsx`, `MyOrders.tsx`, `ErrorBoundary`?**
+  _High betweenness centrality (0.015) - this node is a cross-community bridge._
+- **Should `App.tsx` be split into smaller, more focused modules?**
+  _Cohesion score 0.12162162162162163 - nodes in this community are weakly interconnected._
