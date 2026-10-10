@@ -1,17 +1,20 @@
 import { app } from "./app.js";
 import { startAutoSyncWorker, stopAutoSyncWorker } from "./workers/autoSyncWorker.js";
 import { startOrderQueueWorker, stopOrderQueueWorker } from "./workers/orderQueueWorker.js";
-import { redisConnection } from "./lib/redis.js";
+import { redisConnection, initRedis, closeRedisConnection } from "./lib/redis.js";
 import "dotenv/config";
 
 const DEFAULT_PORT = Number(process.env.PORT) || 5001;
 
 function startServer(port: number) {
-  const server = app.listen(port, () => {
+  const server = app.listen(port, async () => {
     console.log(`🚀 Nara Store Backend Server running on http://localhost:${port}`);
     console.log(`📡 Health check: http://localhost:${port}/api/health`);
     console.log(`🛒 Products API: http://localhost:${port}/api/products`);
     
+    // Inisialisasi Redis (atau auto-fallback ke mode In-Memory jika Docker/Redis offline)
+    await initRedis();
+
     // Aktifkan background sync worker
     startAutoSyncWorker();
 
@@ -34,7 +37,7 @@ function startServer(port: number) {
     stopAutoSyncWorker();
     await stopOrderQueueWorker();
     try {
-      await redisConnection.quit();
+      await closeRedisConnection();
     } catch {}
 
     server.close(() => {

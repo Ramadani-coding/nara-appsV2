@@ -1,4 +1,5 @@
 import { Queue } from "bullmq";
+import { EventEmitter } from "events";
 import { redisConnection, isRedisConnected } from "../lib/redis.js";
 import type { CreateOrderParams } from "../services/order.service.js";
 
@@ -52,21 +53,128 @@ export interface CheckoutJobPayload {
   params: CreateOrderParams;
 }
 
-// Inisialisasi BullMQ Queue
-export const checkoutQueue = new Queue<CheckoutJobPayload>("order-checkout-queue", {
-  connection: redisConnection,
-  defaultJobOptions: {
-    attempts: 2, // Coba ulang 1x jika ada network timeout ke payment gateway
-    backoff: {
-      type: "exponential",
-      delay: 1000,
-    },
-    removeOnComplete: 1000, // Bersihkan riwayat otomatis agar hemat RAM STB
-    removeOnFail: 1000,
-  },
-});
-
 const TICKET_TTL_SECONDS = 900; // 15 menit
+
+// ==========================================
+// IN-MEMORY LOCAL QUEUE & TICKET STORE (FALLBACK)
+// ==========================================
+const inMemoryTickets = new Map<string, OrderTicketData>();
+const inMemoryJobQueue: CheckoutJobPayload[] = [];
+let activeLocalJobCount = 0;
+
+export const localQueueEvents = new EventEmitter();
+
+// Bersihkan tiket memori kadaluarsa setiap 5 menit
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, ticket] of inMemoryTickets.entries()) {
+    if (now - ticket.createdAt > TICKET_TTL_SECONDS * 1000) {
+      inMemoryTickets.delete(id);
+    }
+  }
+}, 5 * 60 * 1000).unref();
+
+export function popNextLocalJob(): CheckoutJobPayload | undefined {
+  return inMemoryJobQueue.shift();
+}
+
+export function setActiveLocalJobCount(count: number): void {
+  activeLocalJobCount = count;
+}
+
+export function getLocalQueueWaitingCount(): number {
+  return inMemoryJobQueue.length;
+}
+
+export function getLocalQueueActiveCount(): number {
+  return activeLocalJobCount;
+}
+
+// ==========================================
+// BULLMQ QUEUE (REDIS MODE)
+// ==========================================
+let bullQueue: Queue<CheckoutJobPayload> | null = null;
+
+function getBullQueue(): Queue<CheckoutJobPayload> | null {
+  if (isRedisConnected()) {
+    if (!bullQueue) {
+      bullQueue = new Queue<CheckoutJobPayload>("order-checkout-queue", {
+        connection: redisConnection,
+        defaultJobOptions: {
+          attempts: 2,
+          backoff: {
+            type: "exponential",
+            delay: 1000,
+          },
+          removeOnComplete: 1000,
+          removeOnFail: 1000,
+        },
+      });
+      bullQueue.on("error", (err) => {
+        console.warn("⚠️ [BullQueue] Peringatan antrean:", err.message);
+      });
+    }
+    return bullQueue;
+  }
+  return null;
+}
+
+/**
+ * Interface adaptif Checkout Queue (Bekerja otomatis di Redis Mode atau In-Memory Mode)
+ */
+export const checkoutQueue = {
+  async getWaitingCount(): Promise<number> {
+    const q = getBullQueue();
+    if (q) {
+      try {
+        return await q.getWaitingCount();
+      } catch {}
+    }
+    return inMemoryJobQueue.length;
+  },
+
+  async getActiveCount(): Promise<number> {
+    const q = getBullQueue();
+    if (q) {
+      try {
+        return await q.getActiveCount();
+      } catch {}
+    }
+    return activeLocalJobCount;
+  },
+
+  async add(name: string, data: CheckoutJobPayload, opts?: any): Promise<any> {
+    const q = getBullQueue();
+    if (q) {
+      return await q.add(name, data, opts);
+    }
+    inMemoryJobQueue.push(data);
+    localQueueEvents.emit("job");
+    return { id: data.ticketId };
+  },
+
+  async getJob(ticketId: string): Promise<any> {
+    const q = getBullQueue();
+    if (q) {
+      try {
+        return await q.getJob(ticketId);
+      } catch {}
+    }
+    const ticket = inMemoryTickets.get(ticketId);
+    if (!ticket) return null;
+    return {
+      id: ticketId,
+      getState: async () => (ticket.status === "processing" ? "active" : ticket.status),
+    };
+  },
+};
+
+/**
+ * Cek apakah sistem antrean checkout aktif (selalu true: Redis atau Local In-Memory)
+ */
+export function isQueueActive(): boolean {
+  return true;
+}
 
 /**
  * Menambahkan pesanan baru ke antrean sistem (Fast Ingest < 15ms)
@@ -80,7 +188,6 @@ export async function enqueueCheckout(params: CreateOrderParams): Promise<{
   const random = Math.random().toString(36).substring(2, 6).toUpperCase();
   const ticketId = `TCK-${timestamp}-${random}`;
 
-  // Hitung posisi saat ini di antrean
   let position = 1;
   try {
     const waitingCount = await checkoutQueue.getWaitingCount();
@@ -90,7 +197,6 @@ export async function enqueueCheckout(params: CreateOrderParams): Promise<{
     console.warn("⚠️ Gagal menghitung posisi antrean pasti, gunakan estimasi:", err);
   }
 
-  // Estimasi waktu tunggu: rata-rata ~1.5 detik per transaksi dibagi concurrency worker
   const estimatedWaitSeconds = Math.max(2, Math.ceil(position * 1.5));
 
   const initialTicket: OrderTicketData = {
@@ -112,18 +218,33 @@ export async function enqueueCheckout(params: CreateOrderParams): Promise<{
     updatedAt: Date.now(),
   };
 
-  // Simpan status awal ke Redis
-  await redisConnection.set(
-    `ticket:${ticketId}`,
-    JSON.stringify(initialTicket),
-    "EX",
-    TICKET_TTL_SECONDS
-  );
+  if (isRedisConnected()) {
+    try {
+      await redisConnection.set(
+        `ticket:${ticketId}`,
+        JSON.stringify(initialTicket),
+        "EX",
+        TICKET_TTL_SECONDS
+      );
+      const q = getBullQueue();
+      if (q) {
+        await q.add("process-order", { ticketId, params }, { jobId: ticketId });
+      }
+    } catch (err: any) {
+      console.warn("⚠️ Gagal menyimpan ke Redis, fallback ke penyimpanan lokal:", err.message);
+      inMemoryTickets.set(ticketId, initialTicket);
+      inMemoryJobQueue.push({ ticketId, params });
+      localQueueEvents.emit("job");
+    }
+  } else {
+    // Mode Lokal In-Memory (Dev tanpa Docker / Redis)
+    inMemoryTickets.set(ticketId, initialTicket);
+    inMemoryJobQueue.push({ ticketId, params });
+    localQueueEvents.emit("job");
+  }
 
-  // Masukkan pekerjaan ke BullMQ
-  await checkoutQueue.add("process-order", { ticketId, params }, { jobId: ticketId });
-
-  console.log(`📥 [OrderQueue] Tiket #${ticketId} berhasil masuk antrean ke-${position} (Est. ${estimatedWaitSeconds}s)`);
+  const mode = isRedisConnected() ? "Redis/BullMQ" : "In-Memory/Lokal";
+  console.log(`📥 [OrderQueue] Tiket #${ticketId} berhasil masuk antrean ke-${position} (${mode}, Est. ${estimatedWaitSeconds}s)`);
 
   return {
     ticketId,
@@ -133,7 +254,7 @@ export async function enqueueCheckout(params: CreateOrderParams): Promise<{
 }
 
 /**
- * Memperbarui status tiket antrean di Redis
+ * Memperbarui status tiket antrean di Redis atau Memory
  */
 export async function updateTicketStatus(
   ticketId: string,
@@ -148,49 +269,57 @@ export async function updateTicketStatus(
     updatedAt: Date.now(),
   };
 
-  await redisConnection.set(
-    `ticket:${ticketId}`,
-    JSON.stringify(merged),
-    "EX",
-    TICKET_TTL_SECONDS
-  );
+  // Selalu perbarui di in-memory cache untuk fallback cepat
+  inMemoryTickets.set(ticketId, merged);
+
+  if (isRedisConnected()) {
+    try {
+      await redisConnection.set(
+        `ticket:${ticketId}`,
+        JSON.stringify(merged),
+        "EX",
+        TICKET_TTL_SECONDS
+      );
+    } catch (err: any) {
+      console.warn("⚠️ Gagal update tiket ke Redis:", err.message);
+    }
+  }
 
   return merged;
 }
 
 /**
- * Mengambil status tiket antrean dari Redis
+ * Mengambil status tiket antrean dari Redis atau Memory
  */
 export async function getTicketStatus(ticketId: string): Promise<OrderTicketData | null> {
-  const raw = await redisConnection.get(`ticket:${ticketId}`);
-  if (!raw) return null;
+  let data: OrderTicketData | null = null;
 
-  try {
-    const data: OrderTicketData = JSON.parse(raw);
-
-    // Jika masih waiting, hitung ulang posisi antrean yang tersisa
-    if (data.status === "waiting") {
-      try {
-        const job = await checkoutQueue.getJob(ticketId);
-        if (job) {
-          const state = await job.getState();
-          if (state === "active") {
-            data.status = "processing";
-            data.position = 1;
-            data.estimatedWaitSeconds = 2;
-          } else {
-            // Hitung berapa job yang mendahului
-            const waitingCount = await checkoutQueue.getWaitingCount();
-            data.position = Math.max(1, Math.min(data.position, waitingCount + 1));
-            data.estimatedWaitSeconds = Math.max(2, Math.ceil(data.position * 1.5));
-          }
-        }
-      } catch {}
+  if (isRedisConnected()) {
+    try {
+      const raw = await redisConnection.get(`ticket:${ticketId}`);
+      if (raw) {
+        data = JSON.parse(raw);
+      }
+    } catch (err: any) {
+      console.warn("⚠️ Gagal membaca tiket dari Redis, memeriksa memori lokal:", err.message);
     }
-
-    return data;
-  } catch (err) {
-    console.error("Gagal parse data tiket dari Redis:", err);
-    return null;
   }
+
+  if (!data) {
+    data = inMemoryTickets.get(ticketId) || null;
+  }
+
+  if (!data) return null;
+
+  // Jika masih waiting, hitung ulang posisi antrean yang tersisa
+  if (data.status === "waiting") {
+    try {
+      const waitingCount = await checkoutQueue.getWaitingCount();
+      const activeCount = await checkoutQueue.getActiveCount();
+      data.position = Math.max(1, Math.min(data.position, waitingCount + activeCount));
+      data.estimatedWaitSeconds = Math.max(2, Math.ceil(data.position * 1.5));
+    } catch {}
+  }
+
+  return data;
 }

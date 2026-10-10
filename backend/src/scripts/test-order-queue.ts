@@ -1,12 +1,15 @@
 import { enqueueCheckout, getTicketStatus } from "../queues/orderQueue.js";
 import { startOrderQueueWorker, stopOrderQueueWorker } from "../workers/orderQueueWorker.js";
-import { redisConnection } from "../lib/redis.js";
+import { redisConnection, initRedis, closeRedisConnection } from "../lib/redis.js";
 import { db } from "../db/index.js";
 import { products } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 
 async function runQueueTest() {
-  console.log("🧪 Memulai Test Alur Antrean Order (BullMQ + Redis)...");
+  console.log("🧪 Memulai Test Alur Antrean Order (Adaptif: Redis / In-Memory)...");
+
+  // Inisialisasi koneksi Redis probe
+  await initRedis();
 
   // 1. Ambil 1 produk aktif dari database
   const product = await db.query.products.findFirst({
@@ -63,7 +66,7 @@ async function runQueueTest() {
 
   // 5. Cleanup
   await stopOrderQueueWorker();
-  await redisConnection.quit();
+  await closeRedisConnection();
   console.log("🏁 Test Antrean Selesai!");
   process.exit(0);
 }

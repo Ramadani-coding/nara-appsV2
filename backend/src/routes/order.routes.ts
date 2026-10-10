@@ -15,7 +15,7 @@ import { db } from "../db/index.js";
 import { orders } from "../db/schema.js";
 import { eq, desc, like, or } from "drizzle-orm";
 import { createOrderLimiter, phoneValidationLimiter } from "../middleware/rateLimiter.js";
-import { enqueueCheckout, getTicketStatus, checkoutQueue } from "../queues/orderQueue.js";
+import { enqueueCheckout, getTicketStatus, checkoutQueue, isQueueActive } from "../queues/orderQueue.js";
 import { isRedisConnected } from "../lib/redis.js";
 
 const router = Router();
@@ -188,8 +188,8 @@ router.post("/checkout-queue", createOrderLimiter, async (req: Request, res: Res
       discordUserId: discordUserId ? String(discordUserId).trim() : undefined,
     };
 
-    // Cek apakah Redis aktif
-    if (isRedisConnected()) {
+    // Cek apakah antrean sistem aktif (Redis atau In-Memory lokal)
+    if (isQueueActive()) {
       try {
         const waitingCount = await checkoutQueue.getWaitingCount();
         const activeCount = await checkoutQueue.getActiveCount();
@@ -210,8 +210,8 @@ router.post("/checkout-queue", createOrderLimiter, async (req: Request, res: Res
         }
 
         // Jika terdeteksi ada lonjakan / antrean aktif:
-        // Masukkan ke antrean BullMQ (Fast Response < 20ms) agar server STB tidak jebol
-        console.log(`🛡️ [OrderRoutes] Beban terdeteksi (Waiting: ${waitingCount}, Active: ${activeCount}). Mengalihkan ke antrean BullMQ...`);
+        // Masukkan ke antrean sistem (Fast Response < 20ms) agar server STB tidak jebol
+        console.log(`🛡️ [OrderRoutes] Beban terdeteksi (Waiting: ${waitingCount}, Active: ${activeCount}). Mengalihkan ke antrean...`);
         const queueData = await enqueueCheckout(orderParams);
         res.status(202).json({
           success: true,
@@ -221,12 +221,12 @@ router.post("/checkout-queue", createOrderLimiter, async (req: Request, res: Res
         });
         return;
       } catch (queueErr: any) {
-        console.warn("⚠️ [OrderRoutes] Gagal memeriksa antrean BullMQ, fallback ke proses langsung:", queueErr.message);
+        console.warn("⚠️ [OrderRoutes] Gagal memeriksa antrean sistem, fallback ke proses langsung:", queueErr.message);
       }
     }
 
-    // Fallback darurat jika Redis sedang offline (misal saat dev tanpa docker): proses langsung
-    console.warn("⚠️ [OrderRoutes] Redis tidak terhubung / bypass, fallback ke pemrosesan langsung.");
+    // Fallback darurat jika antrean gagal / bypass: proses langsung
+    console.warn("⚠️ [OrderRoutes] Antrean bypass / offline, fallback ke pemrosesan langsung.");
     const orderResult = await orderService.createOrderWithQris(orderParams);
     res.status(201).json({
       success: true,

@@ -16,6 +16,7 @@ services:
       - DISCORD_BOT_WEBHOOK_URL=${DISCORD_BOT_WEBHOOK_URL:-http://bot:5002/webhook/delivery}
       - REDIS_HOST=${REDIS_HOST:-redis}
       - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_ENABLED=${REDIS_ENABLED:-true}
     depends_on:
       redis:
         condition: service_healthy
