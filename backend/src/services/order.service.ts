@@ -1152,13 +1152,28 @@ export class OrderService {
         accounts: premkuAccounts,
       });
 
-      await db.insert(deliveries).values({
-        orderId: order.id,
-        productName: firstItem.productName,
-        content: deliveryContent,
-        status: "delivered",
-        deliveredAt: now,
+      const existingDel = await db.query.deliveries.findFirst({
+        where: eq(deliveries.orderId, order.id),
       });
+
+      if (existingDel) {
+        await db
+          .update(deliveries)
+          .set({
+            content: deliveryContent,
+            status: "delivered",
+            deliveredAt: now,
+          })
+          .where(eq(deliveries.id, existingDel.id));
+      } else {
+        await db.insert(deliveries).values({
+          orderId: order.id,
+          productName: firstItem.productName,
+          content: deliveryContent,
+          status: "delivered",
+          deliveredAt: now,
+        });
+      }
 
       await db
         .update(orders)
@@ -1184,13 +1199,28 @@ export class OrderService {
         accounts: [],
       });
 
-      await db.insert(deliveries).values({
-        orderId: order.id,
-        productName: firstItem.productName,
-        content: deliveryContent,
-        status: "processing",
-        deliveredAt: now,
+      const existingDel = await db.query.deliveries.findFirst({
+        where: eq(deliveries.orderId, order.id),
       });
+
+      if (existingDel) {
+        await db
+          .update(deliveries)
+          .set({
+            content: deliveryContent,
+            status: "processing",
+            deliveredAt: now,
+          })
+          .where(eq(deliveries.id, existingDel.id));
+      } else {
+        await db.insert(deliveries).values({
+          orderId: order.id,
+          productName: firstItem.productName,
+          content: deliveryContent,
+          status: "processing",
+          deliveredAt: now,
+        });
+      }
 
       await db
         .update(orders)
