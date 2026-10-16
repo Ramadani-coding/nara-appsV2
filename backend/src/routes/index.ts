@@ -1,7 +1,7 @@
 import { Router } from "express";
 import productRoutes from "./product.routes.js";
 import categoryRoutes from "./category.routes.js";
-import premkuRoutes from "./premku.routes.js";
+import premkuRoutes, { premkuWebhookHandler } from "./premku.routes.js";
 import adminRoutes from "./admin.routes.js";
 import orderRoutes from "./order.routes.js";
 import paymentRoutes from "./payment.routes.js";
@@ -22,6 +22,16 @@ apiRouter.get("/health", (_req, res) => {
 apiRouter.use("/products", productRoutes);
 apiRouter.use("/categories", categoryRoutes);
 apiRouter.use("/premku", premkuRoutes);
+// Alias endpoint agar URL https://domain.com/api/webhook-premku sesuai screenshot dashboard Premku langsung berfungsi
+apiRouter.post("/webhook-premku", premkuWebhookHandler);
+apiRouter.get("/webhook-premku", (_req, res) => {
+  res.json({
+    success: true,
+    status: "ready",
+    service: "Premku Webhook Endpoint",
+    message: "Webhook endpoint aktif dan siap menerima request HTTP POST dari Premku.",
+  });
+});
 apiRouter.use("/admin", adminRoutes);
 apiRouter.use("/admin/vouchers", adminVoucherRouter);
 apiRouter.use("/vouchers", publicVoucherRouter);

@@ -1,4 +1,5 @@
 import "dotenv/config";
+import crypto from "node:crypto";
 
 export interface PremiumkuProduct {
   id: number;
@@ -32,6 +33,16 @@ export interface PremiumkuOrderParams {
   refId: string;
 }
 
+export interface PremiumkuAccount {
+  username?: string;
+  password?: string;
+  email?: string;
+  token?: string;
+  link?: string;
+  code?: string;
+  [key: string]: any;
+}
+
 export interface PremiumkuOrderResponse {
   success: boolean;
   message: string;
@@ -42,6 +53,35 @@ export interface PremiumkuOrderResponse {
   total?: number;
   balance_before?: number;
   balance_after?: number;
+  accounts?: PremiumkuAccount[];
+  data?: {
+    invoice?: string;
+    ref_id?: string;
+    product?: string;
+    qty?: number;
+    price?: number;
+    total?: number;
+    status?: string;
+    accounts?: PremiumkuAccount[];
+    balance_after?: number;
+  };
+}
+
+export interface PremiumkuWebhookPayload {
+  event: string;
+  data: {
+    invoice: string;
+    ref_id: string;
+    product?: string;
+    qty?: number;
+    price?: number;
+    total?: number;
+    status?: string;
+    accounts?: PremiumkuAccount[];
+    balance_after?: number;
+    [key: string]: any;
+  };
+  timestamp?: number;
 }
 
 export interface PremiumkuOrderStatusResponse {
@@ -162,7 +202,15 @@ export class PremiumkuService {
         signal: AbortSignal.timeout(10000),
       });
 
-      return (await res.json()) as PremiumkuOrderResponse;
+      const rawData = (await res.json()) as PremiumkuOrderResponse;
+
+      // Normalisasi response: data.data.invoice dan data.data.accounts dipetakan juga ke root agar instan
+      if (rawData && rawData.data) {
+        if (!rawData.invoice && rawData.data.invoice) rawData.invoice = rawData.data.invoice;
+        if (!rawData.accounts && rawData.data.accounts) rawData.accounts = rawData.data.accounts;
+      }
+
+      return rawData;
     } catch (error: any) {
       console.error(`❌ Error creating order for ref_id ${params.refId}:`, error.message);
       throw error;
@@ -217,6 +265,43 @@ export class PremiumkuService {
     } catch (error: any) {
       console.error("❌ Error fetching profile from Premiumku:", error.message);
       throw error;
+    }
+  }
+
+  /**
+   * Memvalidasi keaslian signature HMAC-SHA256 dari header X-Premku-Signature
+   */
+  verifyWebhookSignature(rawBody: Buffer | string | undefined, signature: string): boolean {
+    const apiSecret = process.env.PREMKU_API_SECRET || process.env.PREMIUMKU_API_SECRET || "";
+
+    // Jika API Secret belum diset di environment, loloskan dengan peringatan agar tidak crash di development lokal
+    if (!apiSecret) {
+      console.warn("⚠️ [PremkuService] PREMKU_API_SECRET belum diset di .env. Melewati validasi signature HMAC.");
+      return true;
+    }
+
+    if (!signature || !rawBody) {
+      console.warn("🚨 [PremkuService] Webhook ditolak: Header X-Premku-Signature atau request body kosong.");
+      return false;
+    }
+
+    try {
+      const payloadString = Buffer.isBuffer(rawBody) ? rawBody.toString("utf8") : String(rawBody);
+      const expectedSig = crypto
+        .createHmac("sha256", apiSecret)
+        .update(payloadString)
+        .digest("hex");
+
+      const cleanSig = signature.trim().toLowerCase();
+      const cleanExpected = expectedSig.trim().toLowerCase();
+
+      if (cleanSig.length === cleanExpected.length) {
+        return crypto.timingSafeEqual(Buffer.from(cleanSig), Buffer.from(cleanExpected));
+      }
+      return cleanSig === cleanExpected;
+    } catch (err: any) {
+      console.error("❌ [PremkuService] Gagal memvalidasi signature webhook:", err.message);
+      return false;
     }
   }
 }

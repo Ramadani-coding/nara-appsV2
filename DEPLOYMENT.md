@@ -118,9 +118,10 @@ DATABASE_URL=postgresql://postgres:[PASSWORD_SUPABASE_ANDA]@db.[ID_PROJECT].supa
 SUPABASE_URL=https://[ID_PROJECT].supabase.co
 SUPABASE_ANON_KEY=[ANON_KEY_ANDA]
 
-# 3. Provider Supplier Premiumku API
+# 3. Provider Supplier Premiumku API & Webhook Callback
 PREMIUMKU_BASE_URL=https://premku.com/api
 PREMIUMKU_API_KEY=[API_KEY_PREMKU_ANDA]
+PREMKU_API_SECRET=[API_SECRET_DARI_PROFIL_PREMKU_ANDA]
 PREMKU_SYNC_INTERVAL_MINUTES=5
 
 # 4. Midtrans Payment Gateway (Mode Production)

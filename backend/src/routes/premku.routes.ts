@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { premiumkuService } from "../services/premiumku.service.js";
+import { orderService } from "../services/order.service.js";
 import { adminAuthMiddleware } from "../middleware/adminAuth.js";
 
 const router = Router();
@@ -105,5 +106,50 @@ router.get("/balance", adminAuthMiddleware, async (req: Request, res: Response) 
     });
   }
 });
+
+/**
+ * Handler pemroses Callback Webhook Premku
+ * Dapat dipanggil dari /api/premku/webhook maupun /api/webhook-premku
+ */
+export async function premkuWebhookHandler(req: Request, res: Response) {
+  const signature = (req.headers["x-premku-signature"] as string) || "";
+  const rawBody = (req as any).rawBody;
+
+  // 1. Validasi Keamanan Signature HMAC-SHA256
+  const isValidSignature = premiumkuService.verifyWebhookSignature(rawBody, signature);
+  if (!isValidSignature) {
+    console.warn("🚨 [PremkuWebhook] Akses ditolak: Signature HMAC X-Premku-Signature tidak cocok.");
+    res.status(403).json({ error: "Invalid signature" });
+    return;
+  }
+
+  // 2. Proses Webhook & Terbitkan Akun ke Pelanggan
+  try {
+    const result = await orderService.handlePremkuWebhook(req.body, signature, rawBody);
+    // Dokumentasi Premku: Wajib balas HTTP 200 OK maksimal dalam 4 detik
+    res.status(200).json({ status: true, message: result.message });
+  } catch (err: any) {
+    console.error("❌ [PremkuWebhook] Gagal memproses webhook:", err);
+    res.status(200).json({ status: false, message: err.message || "Webhook processing error" });
+  }
+}
+
+/**
+ * GET /api/premku/webhook
+ * Info endpoint untuk verifikasi browser bahwa webhook aktif
+ */
+router.get("/webhook", (_req: Request, res: Response) => {
+  res.json({
+    success: true,
+    status: "ready",
+    service: "Premku Webhook Endpoint",
+    message: "Webhook endpoint aktif dan siap menerima request HTTP POST dari Premku.",
+  });
+});
+
+/**
+ * POST /api/premku/webhook
+ */
+router.post("/webhook", premkuWebhookHandler);
 
 export default router;

@@ -66,10 +66,10 @@
     "semantic_hash": "cf30063ba479d5400335b7c807a2b6e2"
   },
   "backend/src/app.ts": {
-    "mtime": 1790127867.158695,
-    "seen": 1791595496.7428796,
-    "ast_hash": "457d2e6ced6ba3010fad1f6ffcb7a1dd",
-    "semantic_hash": "457d2e6ced6ba3010fad1f6ffcb7a1dd"
+    "mtime": 1792147445.732198,
+    "seen": 1792147805.2793946,
+    "ast_hash": "c549a6bf25f0874ef819078d4019ae8f",
+    "semantic_hash": ""
   },
   "backend/src/db/index.ts": {
     "mtime": 1788952193.475736,
@@ -132,9 +132,9 @@
     "semantic_hash": "4e5ce6f3eb0c461c67d5cf4d71113438"
   },
   "backend/src/routes/index.ts": {
-    "mtime": 1791606071.0545688,
-    "seen": 1791607609.9335475,
-    "ast_hash": "02df263d60a98da6097570d4e29461bb",
+    "mtime": 1792148053.2440493,
+    "seen": 1792148103.1340675,
+    "ast_hash": "efe43f791a1fdb417612fde053ccbad9",
     "semantic_hash": ""
   },
   "backend/src/routes/order.routes.ts": {
@@ -150,10 +150,10 @@
     "semantic_hash": "f8fa765e035915671bc04bbfedbc7da7"
   },
   "backend/src/routes/premku.routes.ts": {
-    "mtime": 1789137413.4542925,
-    "seen": 1791595496.7429092,
-    "ast_hash": "d9baf79dc92b64c8a4e754f9896367d2",
-    "semantic_hash": "d9baf79dc92b64c8a4e754f9896367d2"
+    "mtime": 1792148038.423308,
+    "seen": 1792148103.1360672,
+    "ast_hash": "c9ab2588c419caef046823f4f8178128",
+    "semantic_hash": ""
   },
   "backend/src/routes/product.routes.ts": {
     "mtime": 1789138380.3190272,
@@ -300,16 +300,16 @@
     "semantic_hash": "7ac34a10b142443b293853d7da6adce5"
   },
   "backend/src/services/order.service.ts": {
-    "mtime": 1791606210.3111277,
-    "seen": 1791607609.950185,
-    "ast_hash": "34e34655fd2cb08eccec2ca19154d58e",
+    "mtime": 1792147653.4881203,
+    "seen": 1792147805.3043785,
+    "ast_hash": "a00f8b2b6b69c70bd354950a2ee7c2ba",
     "semantic_hash": ""
   },
   "backend/src/services/premiumku.service.ts": {
-    "mtime": 1789137440.195045,
-    "seen": 1791595496.7429647,
-    "ast_hash": "fbfac1433fc35acf0e7f038593816eb9",
-    "semantic_hash": "fbfac1433fc35acf0e7f038593816eb9"
+    "mtime": 1792147544.233075,
+    "seen": 1792147805.3043785,
+    "ast_hash": "71747a1375d8d2ce68fc30cc6f9e8b55",
+    "semantic_hash": ""
   },
   "backend/src/services/sync.service.ts": {
     "mtime": 1790126154.3563416,
@@ -1536,9 +1536,9 @@
     "semantic_hash": ""
   },
   "DEPLOYMENT.md": {
-    "mtime": 1790128008.7535489,
-    "seen": 1791599962.2937508,
-    "ast_hash": "b8e6bdf2434b796df2cfc3ed1ac91c8b",
+    "mtime": 1792147770.9801333,
+    "seen": 1792147805.4777215,
+    "ast_hash": "47c26f6fb1210541faf6f26476ffc257",
     "semantic_hash": ""
   },
   "README.md": {
@@ -1920,9 +1920,15 @@
     "semantic_hash": ""
   },
   "frontend/src/pages/admin/AdminVouchers.tsx": {
-    "mtime": 1791636216.1794078,
-    "seen": 1791636469.1581721,
-    "ast_hash": "ad98778e661a3d1270ea9080677766b9",
+    "mtime": 1791636650.8496046,
+    "seen": 1792147805.3563457,
+    "ast_hash": "c4778e2baba57db20a85ab95368c2c2d",
+    "semantic_hash": ""
+  },
+  "backend/src/scripts/test-premku-webhook.ts": {
+    "mtime": 1792147743.5202374,
+    "seen": 1792147805.2993813,
+    "ast_hash": "1c7fdce65fc7de5c5f365729d4328e91",
     "semantic_hash": ""
   }
 }

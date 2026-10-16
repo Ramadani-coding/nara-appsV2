@@ -13,7 +13,11 @@ app.use(cors({
   origin: process.env.FRONTEND_URL || "*",
   credentials: true,
 }));
-app.use(express.json());
+app.use(express.json({
+  verify: (req: any, _res, buf) => {
+    req.rawBody = buf;
+  },
+}));
 app.use(express.urlencoded({ extended: true }));
 
 // Root welcome endpoint

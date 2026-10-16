@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { db } from "../db/index.js";
 import { orders, orderItems, payments, deliveries, products, vouchers } from "../db/schema.js";
-import { eq, desc, sql, and, gte, lt } from "drizzle-orm";
+import { eq, desc, sql, and, gte, lt, like } from "drizzle-orm";
 import { midtransService } from "./midtrans.service.js";
 import { premiumkuService } from "./premiumku.service.js";
 import { voucherService } from "./voucher.service.js";
@@ -524,14 +524,18 @@ export class OrderService {
 
         if (premkuRes.success) {
           let deliveryContent = "";
-          let premkuAccounts: any[] = [];
+          let premkuAccounts: any[] = premkuRes.accounts || premkuRes.data?.accounts || [];
+          const premkuInvoice = premkuRes.invoice || premkuRes.data?.invoice || "";
 
-          // Ambil detail akun riil langsung dari API Premiumku menggunakan nomor invoice
-          if (premkuRes.invoice) {
-            console.log(`🔍 Mengambil kredensial akun dari Premku untuk invoice ${premkuRes.invoice}...`);
-            for (let attempt = 1; attempt <= 4; attempt++) {
+          // 1. Cek apakah akun langsung diserahkan di response (Instant Atomic Delivery)
+          if (premkuAccounts.length > 0) {
+            console.log(`⚡ [Instant Delivery] Berhasil mendapatkan ${premkuAccounts.length} akun langsung dari response createOrder!`);
+          } else if (premkuInvoice) {
+            // 2. Jika akun belum ada di root response (asynchronous/queued), lakukan quick check 2x
+            console.log(`🔍 Akun belum ada di response awal, mencoba cek status invoice ${premkuInvoice}...`);
+            for (let attempt = 1; attempt <= 2; attempt++) {
               try {
-                const statusRes = await premiumkuService.checkOrderStatus(premkuRes.invoice);
+                const statusRes = await premiumkuService.checkOrderStatus(premkuInvoice);
                 if (statusRes.success && Array.isArray(statusRes.accounts) && statusRes.accounts.length > 0) {
                   premkuAccounts = statusRes.accounts;
                   console.log(`✅ Berhasil mengambil ${premkuAccounts.length} akun dari Premku!`);
@@ -540,15 +544,15 @@ export class OrderService {
               } catch (err: any) {
                 console.warn(`Attempt ${attempt} check status failed:`, err.message);
               }
-              if (attempt < 4) {
-                await new Promise((r) => setTimeout(r, 1200));
+              if (attempt < 2) {
+                await new Promise((r) => setTimeout(r, 800));
               }
             }
           }
 
           if (premkuAccounts.length > 0) {
             deliveryContent = JSON.stringify({
-              invoice: premkuRes.invoice,
+              invoice: premkuInvoice,
               accounts: premkuAccounts,
             });
 
@@ -586,10 +590,11 @@ export class OrderService {
           } else {
             // Supplier masih memproses antrean pembuatan akun
             // Simpan record delivery dengan status "processing" agar UI pelanggan menampilkan status tunggu dan auto-poll
+            // Begitu supplier selesai, Callback Webhook Premku akan langsung menyelesaikan delivery ini!
             deliveryContent = JSON.stringify({
-              invoice: premkuRes.invoice,
+              invoice: premkuInvoice,
               status: "processing",
-              message: "Akun sedang diproses secara instan oleh sistem supplier",
+              message: "Akun sedang diproses secara instan oleh sistem supplier Premku",
               accounts: [],
             });
 
@@ -608,7 +613,7 @@ export class OrderService {
               })
               .where(eq(orders.id, order.id));
 
-            console.log(`⏳ Kredensial akun untuk pesanan ${orderNumber} masih dipersiapkan supplier (Invoice: ${premkuRes.invoice}). Auto-sync akan mengambilnya saat siap.`);
+            console.log(`⏳ Kredensial akun untuk pesanan ${orderNumber} sedang dipersiapkan supplier (Invoice: ${premkuInvoice}). Callback Webhook Premku akan menyelesaikan pengiriman saat siap.`);
           }
         } else {
           console.warn(`⚠️ API Premiumku mengembalikan status belum sukses: ${premkuRes.message}. Pesanan tetap berstatus 'processing' untuk penanganan admin.`);
@@ -1063,18 +1068,19 @@ export class OrderService {
 
     const now = new Date();
     let deliveryContent = "";
-    let premkuAccounts: any[] = [];
+    let premkuAccounts: any[] = premkuRes.accounts || premkuRes.data?.accounts || [];
+    const premkuInvoice = premkuRes.invoice || premkuRes.data?.invoice || "";
 
-    if (premkuRes.invoice) {
-      for (let attempt = 1; attempt <= 4; attempt++) {
+    if (premkuAccounts.length === 0 && premkuInvoice) {
+      for (let attempt = 1; attempt <= 2; attempt++) {
         try {
-          const statusRes = await premiumkuService.checkOrderStatus(premkuRes.invoice);
+          const statusRes = await premiumkuService.checkOrderStatus(premkuInvoice);
           if (statusRes.success && Array.isArray(statusRes.accounts) && statusRes.accounts.length > 0) {
             premkuAccounts = statusRes.accounts;
             break;
           }
         } catch {}
-        if (attempt < 4) await new Promise((r) => setTimeout(r, 1200));
+        if (attempt < 2) await new Promise((r) => setTimeout(r, 800));
       }
     }
 
@@ -1082,7 +1088,7 @@ export class OrderService {
 
     if (premkuAccounts.length > 0) {
       deliveryContent = JSON.stringify({
-        invoice: premkuRes.invoice,
+        invoice: premkuInvoice,
         accounts: premkuAccounts,
       });
 
@@ -1144,6 +1150,128 @@ export class OrderService {
         : `Pesanan berhasil dikirim ke Premku (Invoice: ${premkuRes.invoice}). Supplier sedang memproses akun.`,
       order: updated,
     };
+  }
+
+  /**
+   * Menangani notifikasi Callback Webhook dari Premku
+   * Menyerahkan kredensial akun secara instan saat supplier selesai memproses transaksi
+   */
+  async handlePremkuWebhook(payload: any, _signature?: string, _rawBody?: Buffer | string): Promise<{ success: boolean; message: string }> {
+    console.log("📥 [PremkuWebhook] Menerima webhook:", JSON.stringify(payload));
+
+    const event = payload?.event || "order.success";
+    const data = payload?.data || payload || {};
+    const refId = data.ref_id;
+    const invoice = data.invoice;
+    const accounts = Array.isArray(data.accounts) ? data.accounts : [];
+
+    if (!refId && !invoice) {
+      console.warn("⚠️ [PremkuWebhook] Webhook payload tidak memiliki ref_id atau invoice.");
+      return { success: false, message: "Missing ref_id or invoice" };
+    }
+
+    // 1. Cari pesanan berdasarkan refId
+    let order = refId
+      ? await db.query.orders.findFirst({
+          where: eq(orders.refId, refId),
+          with: {
+            items: true,
+            deliveries: true,
+          },
+        })
+      : null;
+
+    // Fallback: Jika tidak ketemu via refId, cari via invoice di riwayat deliveries
+    if (!order && invoice) {
+      const allDeliveries = await db.query.deliveries.findMany({
+        where: like(deliveries.content, `%${invoice}%`),
+      });
+      if (allDeliveries.length > 0) {
+        order = await db.query.orders.findFirst({
+          where: eq(orders.id, allDeliveries[0].orderId),
+          with: {
+            items: true,
+            deliveries: true,
+          },
+        });
+      }
+    }
+
+    if (!order) {
+      console.warn(`⚠️ [PremkuWebhook] Pesanan dengan ref_id '${refId}' atau invoice '${invoice}' tidak ditemukan di database.`);
+      return { success: false, message: "Order not found in database" };
+    }
+
+    // Idempotency: Jika pesanan sudah completed dan akun sudah tersimpan di delivery, tidak perlu proses ulang
+    const existingDelivery = order.deliveries?.[0];
+    if (order.status === "completed" && existingDelivery?.status === "delivered") {
+      try {
+        const parsed = JSON.parse(existingDelivery.content);
+        if (Array.isArray(parsed.accounts) && parsed.accounts.length > 0) {
+          console.log(`ℹ️ [PremkuWebhook] Pesanan #${order.orderNumber} sudah berstatus completed dan memiliki akun. Mengabaikan webhook duplikat.`);
+          return { success: true, message: "Order already completed and delivered" };
+        }
+      } catch {}
+    }
+
+    if (accounts.length === 0) {
+      console.warn(`⚠️ [PremkuWebhook] Webhook diterima untuk pesanan #${order.orderNumber} tetapi array data.accounts kosong.`);
+      return { success: true, message: "Webhook received but accounts array is empty" };
+    }
+
+    const now = new Date();
+    const firstItem = order.items?.[0];
+    const deliveryContent = JSON.stringify({
+      invoice: invoice || `API-PREMKU-${order.orderNumber}`,
+      accounts: accounts,
+    });
+
+    // 2. Simpan atau perbarui record di tabel deliveries
+    if (existingDelivery) {
+      await db
+        .update(deliveries)
+        .set({
+          content: deliveryContent,
+          status: "delivered",
+          deliveredAt: now,
+        })
+        .where(eq(deliveries.id, existingDelivery.id));
+    } else {
+      await db.insert(deliveries).values({
+        orderId: order.id,
+        productName: firstItem?.productName || "Produk Digital",
+        content: deliveryContent,
+        status: "delivered",
+        deliveredAt: now,
+      });
+    }
+
+    // 3. Update status order menjadi completed
+    await db
+      .update(orders)
+      .set({
+        status: "completed",
+        completedAt: now,
+      })
+      .where(eq(orders.id, order.id));
+
+    // 4. Notifikasi Discord Bot jika terkonfigurasi
+    this.notifyDiscordBotIfConfigured(order.id, order.orderNumber, order.discordUserId);
+
+    // 5. Notifikasi WhatsApp ke pembeli
+    const clientUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    if (order.customerPhone && !order.customerPhone.startsWith("discord:")) {
+      sendOrderSuccessNotification(
+        order.customerPhone,
+        order.orderNumber,
+        firstItem?.productName || "Produk Digital",
+        order.totalAmount,
+        clientUrl
+      ).catch((err) => console.warn(`⚠️ Gagal kirim WA order success webhook #${order.orderNumber}:`, err.message));
+    }
+
+    console.log(`🎉 [PremkuWebhook] Pesanan #${order.orderNumber} berhasil diperbarui menjadi COMPLETED via Webhook Premku (${accounts.length} akun diserahkan)!`);
+    return { success: true, message: "Order completed and delivered successfully via webhook" };
   }
 
   /**
