@@ -17,6 +17,9 @@ const ORDER_SECRET_SALT = process.env.ORDER_SECRET_SALT || "nara-order-security-
 const midtransCheckThrottle = new Map<string, number>();
 const MIDTRANS_THROTTLE_MS = 12 * 1000; // Minimal selang 12 detik kecuali forceSync
 
+// In-memory mutex/lock untuk mencegah eksekusi settlement ganda serentak (Race condition antara Webhook & Polling)
+const inFlightSettlement = new Set<string>();
+
 /**
  * Menormalkan nomor telepon (menghilangkan spasi, tanda minus, mengubah 62 / +62 menjadi 08)
  */
@@ -449,24 +452,31 @@ export class OrderService {
    * dan otomatis memicu Create Order ke penyedia Premiumku
    */
   async handlePaymentSettlement(orderNumber: string, midtransPayload?: any) {
-    const order = await db.query.orders.findFirst({
-      where: eq(orders.orderNumber, orderNumber),
-      with: {
-        items: true,
-        payments: true,
-        deliveries: true,
-      },
-    });
-
-    if (!order) {
-      throw new Error(`Pesanan dengan nomor ${orderNumber} tidak ditemukan`);
+    if (inFlightSettlement.has(orderNumber)) {
+      console.log(`⏳ [SettlementLock] Pesanan ${orderNumber} sedang diproses oleh thread lain. Mengabaikan eksekusi serentak.`);
+      return { success: true, alreadyProcessed: true };
     }
+    inFlightSettlement.add(orderNumber);
 
-    // Idempotency check: jika pesanan sudah dibayar atau selesai, jangan proses ulang
-    if (order.status === "paid" || order.status === "processing" || order.status === "completed") {
-      console.log(`ℹ️ Pesanan ${orderNumber} sudah berstatus '${order.status}'. Mengabaikan duplikasi webhook.`);
-      return { success: true, order, alreadyProcessed: true };
-    }
+    try {
+      const order = await db.query.orders.findFirst({
+        where: eq(orders.orderNumber, orderNumber),
+        with: {
+          items: true,
+          payments: true,
+          deliveries: true,
+        },
+      });
+
+      if (!order) {
+        throw new Error(`Pesanan dengan nomor ${orderNumber} tidak ditemukan`);
+      }
+
+      // Idempotency check: jika pesanan sudah dibayar atau selesai, jangan proses ulang
+      if (order.status === "paid" || order.status === "processing" || order.status === "completed") {
+        console.log(`ℹ️ Pesanan ${orderNumber} sudah berstatus '${order.status}'. Mengabaikan duplikasi webhook.`);
+        return { success: true, order, alreadyProcessed: true };
+      }
 
     const now = new Date();
 
@@ -556,13 +566,29 @@ export class OrderService {
               accounts: premkuAccounts,
             });
 
-            await db.insert(deliveries).values({
-              orderId: order.id,
-              productName: firstItem.productName,
-              content: deliveryContent,
-              status: "delivered",
-              deliveredAt: now,
+            // Cegah duplikasi record delivery: cek apakah sudah pernah dibuat untuk orderId ini
+            const existingDel = await db.query.deliveries.findFirst({
+              where: eq(deliveries.orderId, order.id),
             });
+
+            if (existingDel) {
+              await db
+                .update(deliveries)
+                .set({
+                  content: deliveryContent,
+                  status: "delivered",
+                  deliveredAt: now,
+                })
+                .where(eq(deliveries.id, existingDel.id));
+            } else {
+              await db.insert(deliveries).values({
+                orderId: order.id,
+                productName: firstItem.productName,
+                content: deliveryContent,
+                status: "delivered",
+                deliveredAt: now,
+              });
+            }
 
             await db
               .update(orders)
@@ -598,13 +624,28 @@ export class OrderService {
               accounts: [],
             });
 
-            await db.insert(deliveries).values({
-              orderId: order.id,
-              productName: firstItem.productName,
-              content: deliveryContent,
-              status: "processing",
-              deliveredAt: now,
+            const existingDel = await db.query.deliveries.findFirst({
+              where: eq(deliveries.orderId, order.id),
             });
+
+            if (existingDel) {
+              await db
+                .update(deliveries)
+                .set({
+                  content: deliveryContent,
+                  status: "processing",
+                  deliveredAt: now,
+                })
+                .where(eq(deliveries.id, existingDel.id));
+            } else {
+              await db.insert(deliveries).values({
+                orderId: order.id,
+                productName: firstItem.productName,
+                content: deliveryContent,
+                status: "processing",
+                deliveredAt: now,
+              });
+            }
 
             await db
               .update(orders)
@@ -629,13 +670,29 @@ export class OrderService {
       } else {
         // Fallback: Jika produk tidak terikat ke providerId tertentu, buat delivery manual / instant placeholder
         const deliveryContent = `Produk: ${firstItem?.productName || "Produk Digital"}\nStatus: Siap Diakses\nSilakan hubungi WhatsApp admin dengan menyertakan Nomor Pesanan ${order.orderNumber}.`;
-        await db.insert(deliveries).values({
-          orderId: order.id,
-          productName: firstItem?.productName || "Produk Digital",
-          content: deliveryContent,
-          status: "delivered",
-          deliveredAt: now,
+
+        const existingDel = await db.query.deliveries.findFirst({
+          where: eq(deliveries.orderId, order.id),
         });
+
+        if (existingDel) {
+          await db
+            .update(deliveries)
+            .set({
+              content: deliveryContent,
+              status: "delivered",
+              deliveredAt: now,
+            })
+            .where(eq(deliveries.id, existingDel.id));
+        } else {
+          await db.insert(deliveries).values({
+            orderId: order.id,
+            productName: firstItem?.productName || "Produk Digital",
+            content: deliveryContent,
+            status: "delivered",
+            deliveredAt: now,
+          });
+        }
 
         await db
           .update(orders)
@@ -679,7 +736,10 @@ export class OrderService {
       },
     });
 
-    return { success: true, order: updatedOrder };
+      return { success: true, order: updatedOrder };
+    } finally {
+      inFlightSettlement.delete(orderNumber);
+    }
   }
 
   /**
@@ -1202,13 +1262,27 @@ export class OrderService {
       return { success: false, message: "Order not found in database" };
     }
 
-    // Idempotency: Jika pesanan sudah completed dan akun sudah tersimpan di delivery, tidak perlu proses ulang
-    const existingDelivery = order.deliveries?.[0];
-    if (order.status === "completed" && existingDelivery?.status === "delivered") {
+    // 2. Cek fresh record deliveries untuk pesanan ini
+    const allOrderDeliveries = await db.query.deliveries.findMany({
+      where: eq(deliveries.orderId, order.id),
+      orderBy: [desc(deliveries.id)],
+    });
+
+    const primaryDelivery = allOrderDeliveries[0] || null;
+
+    // Bersihkan jika ada record delivery duplikat sebelumnya
+    if (allOrderDeliveries.length > 1) {
+      for (let i = 1; i < allOrderDeliveries.length; i++) {
+        await db.delete(deliveries).where(eq(deliveries.id, allOrderDeliveries[i].id));
+      }
+    }
+
+    // Idempotency: Jika pesanan sudah delivered dan memiliki akun, jangan proses ulang
+    if (primaryDelivery && primaryDelivery.status === "delivered") {
       try {
-        const parsed = JSON.parse(existingDelivery.content);
+        const parsed = JSON.parse(primaryDelivery.content);
         if (Array.isArray(parsed.accounts) && parsed.accounts.length > 0) {
-          console.log(`ℹ️ [PremkuWebhook] Pesanan #${order.orderNumber} sudah berstatus completed dan memiliki akun. Mengabaikan webhook duplikat.`);
+          console.log(`ℹ️ [PremkuWebhook] Pesanan #${order.orderNumber} sudah berstatus delivered dan memiliki akun. Mengabaikan webhook duplikat.`);
           return { success: true, message: "Order already completed and delivered" };
         }
       } catch {}
@@ -1226,8 +1300,8 @@ export class OrderService {
       accounts: accounts,
     });
 
-    // 2. Simpan atau perbarui record di tabel deliveries
-    if (existingDelivery) {
+    // 3. Simpan atau perbarui record di tabel deliveries
+    if (primaryDelivery) {
       await db
         .update(deliveries)
         .set({
@@ -1235,7 +1309,7 @@ export class OrderService {
           status: "delivered",
           deliveredAt: now,
         })
-        .where(eq(deliveries.id, existingDelivery.id));
+        .where(eq(deliveries.id, primaryDelivery.id));
     } else {
       await db.insert(deliveries).values({
         orderId: order.id,

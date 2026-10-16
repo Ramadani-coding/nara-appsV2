@@ -176,12 +176,21 @@ export async function findInvoiceAsync(query: string, options?: FindInvoiceOptio
 
             if (parsedPremkuAccounts && parsedPremkuAccounts.length > 0) {
               parsedPremkuAccounts.forEach((acc: any) => {
-                accounts.push({
-                  title: `AKUN #${accounts.length + 1}`,
-                  packageBadge: (acc.product_type || del.productName || firstItem?.productName || 'PREMIUM').toUpperCase(),
-                  emailOrUsername: acc.username || acc.email || '-',
-                  passwordOrCode: acc.password || acc.token || acc.link || acc.code || '-',
-                });
+                const user = acc.username || acc.email || '-';
+                const pass = acc.password || acc.token || acc.link || acc.code || '-';
+
+                const isDuplicate = accounts.some(
+                  (existing) => existing.emailOrUsername === user && existing.passwordOrCode === pass
+                );
+
+                if (!isDuplicate && accounts.length < qtyCount) {
+                  accounts.push({
+                    title: `AKUN #${accounts.length + 1}`,
+                    packageBadge: (acc.product_type || del.productName || firstItem?.productName || 'PREMIUM').toUpperCase(),
+                    emailOrUsername: user,
+                    passwordOrCode: pass,
+                  });
+                }
               });
               return;
             }
@@ -210,12 +219,17 @@ export async function findInvoiceAsync(query: string, options?: FindInvoiceOptio
             }
 
             if (parsedUser || parsedPass) {
-              accounts.push({
-                title: `AKUN #${accounts.length + 1}`,
-                packageBadge: del.productName.toUpperCase(),
-                emailOrUsername: parsedUser || '-',
-                passwordOrCode: parsedPass || '-',
-              });
+              const isDuplicate = accounts.some(
+                (existing) => existing.emailOrUsername === (parsedUser || '-') && existing.passwordOrCode === (parsedPass || '-')
+              );
+              if (!isDuplicate && accounts.length < qtyCount) {
+                accounts.push({
+                  title: `AKUN #${accounts.length + 1}`,
+                  packageBadge: del.productName.toUpperCase(),
+                  emailOrUsername: parsedUser || '-',
+                  passwordOrCode: parsedPass || '-',
+                });
+              }
               return;
             }
 
@@ -227,12 +241,15 @@ export async function findInvoiceAsync(query: string, options?: FindInvoiceOptio
 
             // Plain text manual
             if (del.content.trim()) {
-              accounts.push({
-                title: `AKUN #${accounts.length + 1}`,
-                packageBadge: del.productName.toUpperCase(),
-                emailOrUsername: '-',
-                passwordOrCode: del.content,
-              });
+              const isDuplicate = accounts.some((existing) => existing.passwordOrCode === del.content);
+              if (!isDuplicate && accounts.length < qtyCount) {
+                accounts.push({
+                  title: `AKUN #${accounts.length + 1}`,
+                  packageBadge: del.productName.toUpperCase(),
+                  emailOrUsername: '-',
+                  passwordOrCode: del.content,
+                });
+              }
             }
           }
         });
