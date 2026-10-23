@@ -363,7 +363,7 @@ router.post("/:orderNumber/verify-phone", phoneValidationLimiter, async (req: Re
       return;
     }
 
-    const clientIp = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "client-ip";
+    const clientIp = req.ip || req.socket.remoteAddress || "client-ip";
     const rateLimitKey = `${clientIp}:${orderNumber}`;
 
     const rateCheck = checkRateLimit(rateLimitKey);

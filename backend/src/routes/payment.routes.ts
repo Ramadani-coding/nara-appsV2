@@ -114,6 +114,8 @@ router.get("/:orderNumber/status", paymentStatusLimiter, async (req: Request, re
         orderNumber: order.orderNumber,
         status: order.status,
         totalAmount: order.totalAmount,
+        uniqueCode: (order as any).uniqueCode || 0,
+        paymentGateway: (order as any).paymentGateway || "gopay",
         createdAt: order.createdAt,
         paidAt: order.paidAt,
         completedAt: order.completedAt,
@@ -123,9 +125,10 @@ router.get("/:orderNumber/status", paymentStatusLimiter, async (req: Request, re
               transactionId: latestPayment.transactionId,
               paymentMethod: latestPayment.paymentMethod,
               qrCodeUrl: latestPayment.qrCodeUrl,
+              qrString: (latestPayment as any).qrString || null,
               status: latestPayment.status,
               settledAt: latestPayment.settledAt,
-              expiryTime: (latestPayment as any).expiryTime || parseMidtransExpiry(latestPayment.rawCallback),
+              expiryTime: (latestPayment as any).expiryTime || parseMidtransExpiry(latestPayment.rawCallback, order.createdAt),
             }
           : null,
         items: order.items,
@@ -143,16 +146,68 @@ router.get("/:orderNumber/status", paymentStatusLimiter, async (req: Request, re
 });
 
 /**
+ * POST /api/payments/:orderNumber/switch-fallback
+ * Mengalihkan pembayaran GoPay yang bermasalah/kadaluarsa ke Midtrans QRIS
+ */
+router.post("/:orderNumber/switch-fallback", paymentStatusLimiter, async (req: Request, res: Response) => {
+  try {
+    const { orderNumber } = req.params;
+    if (!orderNumber) {
+      res.status(400).json({ success: false, message: "Nomor order wajib disertakan" });
+      return;
+    }
+
+    const order = await orderService.switchToMidtransFallback(orderNumber);
+    const latestPayment = order.payments && order.payments.length > 0
+      ? order.payments[order.payments.length - 1]
+      : null;
+
+    res.json({
+      success: true,
+      message: "Berhasil beralih ke pembayaran cadangan Midtrans QRIS",
+      data: {
+        orderNumber: order.orderNumber,
+        status: order.status,
+        totalAmount: order.totalAmount,
+        uniqueCode: (order as any).uniqueCode || 0,
+        paymentGateway: (order as any).paymentGateway || "midtrans",
+        createdAt: order.createdAt,
+        payment: latestPayment
+          ? {
+              id: latestPayment.id,
+              transactionId: latestPayment.transactionId,
+              paymentMethod: latestPayment.paymentMethod,
+              qrCodeUrl: latestPayment.qrCodeUrl,
+              qrString: (latestPayment as any).qrString || null,
+              status: latestPayment.status,
+              expiryTime: (latestPayment as any).expiryTime || parseMidtransExpiry(latestPayment.rawCallback, order.createdAt),
+            }
+          : null,
+      },
+    });
+  } catch (error: any) {
+    console.error("Error switching to Midtrans fallback:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Gagal beralih ke pembayaran cadangan",
+    });
+  }
+});
+
+/**
  * POST /api/payments/:orderNumber/simulate-pay
  * Simulasi instan pelunasan transaksi (khusus mode sandbox / testing)
  */
 router.post("/:orderNumber/simulate-pay", async (req: Request, res: Response) => {
   try {
-    // Keamanan Mutlak: Cegah eksploitasi di lingkungan production
-    if (process.env.NODE_ENV === "production" || process.env.MIDTRANS_IS_PRODUCTION === "true") {
+    // Keamanan Mutlak: Cegah eksploitasi di lingkungan production (Default-Deny)
+    const isDevelopment = process.env.NODE_ENV === "development" || process.env.ENABLE_PAYMENT_SIMULATION === "true";
+    const isProduction = process.env.NODE_ENV === "production" || process.env.MIDTRANS_IS_PRODUCTION === "true";
+
+    if (!isDevelopment || isProduction) {
       res.status(403).json({
         success: false,
-        message: "Akses ditolak: Simulasi pembayaran dinonaktifkan permanen pada mode produksi.",
+        message: "Akses ditolak: Simulasi pembayaran dinonaktifkan permanen pada lingkungan produksi.",
       });
       return;
     }

@@ -8,9 +8,29 @@ export const app = express();
 // Konfigurasi trust proxy untuk deployment di balik Nginx reverse proxy
 app.set("trust proxy", 1);
 
-// Middleware
+// Konfigurasi CORS yang aman untuk Production & Development
+const rawFrontendUrls = process.env.FRONTEND_URL || "";
+const allowedOrigins = rawFrontendUrls
+  ? rawFrontendUrls.split(",").map((u) => u.trim().replace(/\/$/, ""))
+  : [];
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || "*",
+  origin: (origin, callback) => {
+    // 1. Izinkan request tanpa origin (seperti webhook Midtrans, Gojek, cURL, server-to-server)
+    if (!origin) return callback(null, true);
+
+    // 2. Di mode development, izinkan akses lokal
+    if (process.env.NODE_ENV !== "production") {
+      return callback(null, true);
+    }
+
+    // 3. Di mode production, pastikan origin terdaftar di FRONTEND_URL
+    if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`CORS policy violation: Origin ${origin} not allowed`), false);
+  },
   credentials: true,
 }));
 app.use(express.json({

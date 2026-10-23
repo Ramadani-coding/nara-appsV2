@@ -92,6 +92,8 @@ export const orders = pgTable("orders", {
   completedAt: timestamp("completed_at", { withTimezone: true }),
   discordUserId: varchar("discord_user_id", { length: 100 }),
   discordDmSent: boolean("discord_dm_sent").notNull().default(false),
+  uniqueCode: integer("unique_code").notNull().default(0),
+  paymentGateway: varchar("payment_gateway", { length: 50 }).notNull().default("gopay"),
 }, (table) => [
   index("orders_order_number_idx").on(table.orderNumber),
   index("orders_ref_id_idx").on(table.refId),
@@ -99,6 +101,7 @@ export const orders = pgTable("orders", {
   index("orders_status_idx").on(table.status),
   index("orders_discord_user_id_idx").on(table.discordUserId),
   index("orders_voucher_id_idx").on(table.voucherId),
+  index("orders_payment_gateway_idx").on(table.paymentGateway),
 ]);
 
 // -----------------------------------------------------------------------------
@@ -126,6 +129,7 @@ export const payments = pgTable("payments", {
   transactionId: varchar("transaction_id", { length: 255 }),
   paymentMethod: varchar("payment_method", { length: 50 }).notNull().default("qris"),
   qrCodeUrl: text("qr_code_url"),
+  qrString: text("qr_string"),
   status: varchar("status", { length: 50 }).notNull().default("pending"),
   rawCallback: jsonb("raw_callback"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

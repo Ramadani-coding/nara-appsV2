@@ -8,6 +8,9 @@ dist/
 .env
 .env.*
 !.env.example
+.gopay_session.json
+*.gopay*
+.GOPAY_SESI_JANGAN_DIHAPUS.json
 
 # Logs
 logs/

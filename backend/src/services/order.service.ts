@@ -3,6 +3,7 @@ import { db } from "../db/index.js";
 import { orders, orderItems, payments, deliveries, products, vouchers } from "../db/schema.js";
 import { eq, desc, sql, and, gte, lt, like } from "drizzle-orm";
 import { midtransService } from "./midtrans.service.js";
+import { gopayService } from "./gopay.service.js";
 import { premiumkuService } from "./premiumku.service.js";
 import { voucherService } from "./voucher.service.js";
 import { 
@@ -12,6 +13,9 @@ import {
 } from "./whatsapp.service.js";
 
 const ORDER_SECRET_SALT = process.env.ORDER_SECRET_SALT || "nara-order-security-salt-2026-xyz";
+if (!process.env.ORDER_SECRET_SALT && process.env.NODE_ENV === "production") {
+  console.warn("⚠️ [SECURITY WARNING] ORDER_SECRET_SALT belum disetel di .env! Harap tentukan secret salt acak unik di production untuk melindungi integritas token pesanan.");
+}
 
 // In-memory throttle untuk membatasi frekuensi query langsung ke Midtrans API per order (Anti-DDoS / Rate Limit)
 const midtransCheckThrottle = new Map<string, number>();
@@ -98,16 +102,30 @@ export interface CreateOrderParams {
   voucherCode?: string;
 }
 
-export function parseMidtransExpiry(rawCallback: any): string | null {
-  if (!rawCallback) return null;
+export function parseMidtransExpiry(rawCallback: any, fallbackCreatedAt?: any): string | null {
+  if (!rawCallback) {
+    if (fallbackCreatedAt) {
+      return new Date(new Date(fallbackCreatedAt).getTime() + 15 * 60 * 1000).toISOString();
+    }
+    return null;
+  }
   let raw = rawCallback;
   if (typeof raw === "string") {
     try {
       raw = JSON.parse(raw);
     } catch {}
   }
+  if (raw?.expiresAt) {
+    const date = new Date(raw.expiresAt);
+    if (!isNaN(date.getTime())) return date.toISOString();
+  }
   const expiry = raw?.expiry_time || raw?.expiryTime;
-  if (!expiry || typeof expiry !== "string") return null;
+  if (!expiry || typeof expiry !== "string") {
+    if (fallbackCreatedAt) {
+      return new Date(new Date(fallbackCreatedAt).getTime() + 15 * 60 * 1000).toISOString();
+    }
+    return null;
+  }
   try {
     if (expiry.includes("T")) {
       const date = new Date(expiry);
@@ -332,46 +350,116 @@ export class OrderService {
         subtotal: subtotalAmount,
       });
 
-      // 6. Buat transaksi QRIS di Midtrans Core API
-      const midtransItems = [
-        {
-          id: String(dbProduct?.id || "ITEM-1"),
-          name: productName,
-          price: unitPrice,
-          quantity: qty,
-        },
-      ];
+      // 6. Buat transaksi QRIS (GoPay Merchant sebagai Utama, Midtrans sebagai Fallback)
+      let chosenGateway: "gopay" | "midtrans" = gopayService.isAvailable() ? "gopay" : "midtrans";
+      let finalTotalAmount = totalAmount;
+      let uniqueCode = 0;
 
-      if (discountAmount > 0 && appliedVoucher) {
-        midtransItems.push({
-          id: `VOUCHER-${appliedVoucher.code}`.slice(0, 50),
-          name: `Diskon: ${appliedVoucher.code}`.slice(0, 50),
-          price: -discountAmount,
-          quantity: 1,
-        });
+      if (chosenGateway === "gopay") {
+        try {
+          // Kode Unik 3 Digit (100 - 999) agar garansi 100% tidak ada nominal tabrakan
+          uniqueCode = Math.floor(100 + Math.random() * 900);
+          finalTotalAmount = totalAmount + uniqueCode;
+
+          console.log(`💳 [GoPay Gateway] Menghasilkan QRIS Dinamis untuk Order #${newOrder.orderNumber} (Nominal: Rp ${finalTotalAmount}, Termasuk Kode Unik ${uniqueCode})...`);
+          const qrisRes = await gopayService.createQrisCharge(finalTotalAmount, 15);
+
+          // Update nominal akhir & kode unik di tabel orders
+          await db
+            .update(orders)
+            .set({
+              totalAmount: finalTotalAmount,
+              uniqueCode,
+              paymentGateway: "gopay",
+            })
+            .where(eq(orders.id, newOrder.id));
+
+          newOrder.totalAmount = finalTotalAmount;
+          (newOrder as any).uniqueCode = uniqueCode;
+          (newOrder as any).paymentGateway = "gopay";
+
+          const [insertedPayment] = await db
+            .insert(payments)
+            .values({
+              orderId: newOrder.id,
+              transactionId: `GOPAY-${newOrder.orderNumber}`,
+              paymentMethod: "gopay_qris",
+              qrCodeUrl: qrisRes.qrCodeUrl,
+              qrString: qrisRes.qrString,
+              status: "pending",
+              rawCallback: {
+                gateway: "gopay",
+                uniqueCode,
+                originalAmount: totalAmount,
+                finalAmount: finalTotalAmount,
+                expiresAt: qrisRes.expiresAt.toISOString(),
+              },
+            })
+            .returning();
+          paymentRecord = insertedPayment;
+        } catch (gopayErr: any) {
+          console.warn(`⚠️ [GoPay Failover] Gagal membuat QRIS GoPay: ${gopayErr.message}. Otomatis beralih ke Midtrans QRIS...`);
+          chosenGateway = "midtrans";
+          uniqueCode = 0;
+          finalTotalAmount = totalAmount;
+        }
       }
 
-      qrisCharge = await midtransService.createQrisCharge({
-        orderNumber: newOrder.orderNumber,
-        grossAmount: totalAmount,
-        customerPhone: newOrder.customerPhone || "081200000000",
-        customerEmail: newOrder.customerEmail || undefined,
-        items: midtransItems,
-      });
+      // Fallback ke Midtrans jika GoPay tidak aktif atau mengalami kendala
+      if (chosenGateway === "midtrans") {
+        await db
+          .update(orders)
+          .set({
+            totalAmount: finalTotalAmount,
+            uniqueCode: 0,
+            paymentGateway: "midtrans",
+          })
+          .where(eq(orders.id, newOrder.id));
 
-      // 7. Simpan transaksi pembayaran ke tabel `payments`
-      const [insertedPayment] = await db
-        .insert(payments)
-        .values({
-          orderId: newOrder.id,
-          transactionId: qrisCharge.transactionId,
-          paymentMethod: "qris",
-          qrCodeUrl: qrisCharge.qrCodeUrl,
-          status: "pending",
-          rawCallback: qrisCharge.raw,
-        })
-        .returning();
-      paymentRecord = insertedPayment;
+        newOrder.totalAmount = finalTotalAmount;
+        (newOrder as any).uniqueCode = 0;
+        (newOrder as any).paymentGateway = "midtrans";
+
+        const midtransItems = [
+          {
+            id: String(dbProduct?.id || "ITEM-1"),
+            name: productName,
+            price: unitPrice,
+            quantity: qty,
+          },
+        ];
+
+        if (discountAmount > 0 && appliedVoucher) {
+          midtransItems.push({
+            id: `VOUCHER-${appliedVoucher.code}`.slice(0, 50),
+            name: `Diskon: ${appliedVoucher.code}`.slice(0, 50),
+            price: -discountAmount,
+            quantity: 1,
+          });
+        }
+
+        qrisCharge = await midtransService.createQrisCharge({
+          orderNumber: newOrder.orderNumber,
+          grossAmount: totalAmount,
+          customerPhone: newOrder.customerPhone || "081200000000",
+          customerEmail: newOrder.customerEmail || undefined,
+          items: midtransItems,
+        });
+
+        const [insertedPayment] = await db
+          .insert(payments)
+          .values({
+            orderId: newOrder.id,
+            transactionId: qrisCharge.transactionId,
+            paymentMethod: "midtrans_qris",
+            qrCodeUrl: qrisCharge.qrCodeUrl,
+            qrString: qrisCharge.qrString,
+            status: "pending",
+            rawCallback: qrisCharge.raw,
+          })
+          .returning();
+        paymentRecord = insertedPayment;
+      }
     } catch (err: any) {
       console.error(`❌ Gagal menyelesaikan pesanan #${orderNumber}:`, err.message);
 
@@ -426,6 +514,8 @@ export class OrderService {
       refId: newOrder.refId,
       subtotalAmount,
       discountAmount,
+      uniqueCode: (newOrder as any).uniqueCode || 0,
+      paymentGateway: (newOrder as any).paymentGateway || "gopay",
       voucherCode: appliedVoucher?.code || null,
       totalAmount: newOrder.totalAmount,
       status: newOrder.status,
@@ -437,11 +527,11 @@ export class OrderService {
       unitPrice,
       payment: {
         id: paymentRecord.id,
-        transactionId: qrisCharge.transactionId,
-        paymentMethod: "qris",
-        qrCodeUrl: qrisCharge.qrCodeUrl,
-        qrString: qrisCharge.qrString,
-        expiryTime: parseMidtransExpiry(qrisCharge.raw) || qrisCharge.expiryTime,
+        transactionId: paymentRecord.transactionId,
+        paymentMethod: paymentRecord.paymentMethod,
+        qrCodeUrl: paymentRecord.qrCodeUrl,
+        qrString: (paymentRecord as any).qrString || null,
+        expiryTime: parseMidtransExpiry(paymentRecord.rawCallback, newOrder.createdAt),
         status: "pending",
       },
     };
@@ -451,7 +541,7 @@ export class OrderService {
    * Menangani pembayaran sukses (settlement) secara idempotent
    * dan otomatis memicu Create Order ke penyedia Premiumku
    */
-  async handlePaymentSettlement(orderNumber: string, midtransPayload?: any) {
+  async handlePaymentSettlement(orderNumber: string, payload?: any, transactionIdOverride?: string) {
     if (inFlightSettlement.has(orderNumber)) {
       console.log(`⏳ [SettlementLock] Pesanan ${orderNumber} sedang diproses oleh thread lain. Mengabaikan eksekusi serentak.`);
       return { success: true, alreadyProcessed: true };
@@ -474,21 +564,40 @@ export class OrderService {
 
       // Idempotency check: jika pesanan sudah dibayar atau selesai, jangan proses ulang
       if (order.status === "paid" || order.status === "processing" || order.status === "completed") {
-        console.log(`ℹ️ Pesanan ${orderNumber} sudah berstatus '${order.status}'. Mengabaikan duplikasi webhook.`);
+        console.log(`ℹ️ Pesanan ${orderNumber} sudah berstatus '${order.status}'. Mengabaikan duplikasi callback.`);
         return { success: true, order, alreadyProcessed: true };
       }
 
-    const now = new Date();
+      // Keamanan Anti-Double Claim: Pastikan transaksi gateway ini belum pernah diklaim pesanan lain
+      if (transactionIdOverride) {
+        const existingClaim = await db.query.payments.findFirst({
+          where: and(
+            eq(payments.transactionId, transactionIdOverride),
+            eq(payments.status, "settlement")
+          ),
+        });
+        if (existingClaim && existingClaim.orderId !== order.id) {
+          console.warn(`🚨 [Security Alert] Transaksi ${transactionIdOverride} sudah pernah diklaim oleh pesanan ID ${existingClaim.orderId}! Menolak klaim ganda.`);
+          return { success: false, alreadyClaimed: true };
+        }
+      }
 
-    // 1. Update status pembayaran di tabel `payments`
-    await db
-      .update(payments)
-      .set({
+      const now = new Date();
+
+      // 1. Update status pembayaran di tabel `payments`
+      const paymentUpdateValues: any = {
         status: "settlement",
         settledAt: now,
-        rawCallback: midtransPayload || sql`raw_callback`,
-      })
-      .where(eq(payments.orderId, order.id));
+        rawCallback: payload || sql`raw_callback`,
+      };
+      if (transactionIdOverride) {
+        paymentUpdateValues.transactionId = transactionIdOverride;
+      }
+
+      await db
+        .update(payments)
+        .set(paymentUpdateValues)
+        .where(eq(payments.orderId, order.id));
 
     // 2. Update status pesanan di tabel `orders` menjadi `paid`
     await db
@@ -844,8 +953,8 @@ export class OrderService {
   }
 
   /**
-   * Sinkronisasi status pesanan dengan Midtrans Core API secara real-time
-   * (Digunakan saat polling di frontend dengan rate throttle pintar untuk mencegah pemblokiran IP oleh Midtrans)
+   * Sinkronisasi status pesanan dengan GoPay Analytics API / Midtrans Core API secara real-time
+   * (Digunakan saat polling di frontend dengan rate throttle pintar untuk mencegah pemblokiran IP)
    */
   async syncOrderStatusWithMidtrans(orderNumber: string, forceSync = false) {
     const order = await db.query.orders.findFirst({
@@ -859,51 +968,96 @@ export class OrderService {
 
     if (!order) return null;
 
-    // Jika pesanan masih berstatus waiting_payment
-    if (order.status === "waiting_payment") {
-      const now = Date.now();
-      const lastCheck = midtransCheckThrottle.get(orderNumber) || 0;
-      const shouldCheckMidtrans = forceSync || (now - lastCheck >= MIDTRANS_THROTTLE_MS);
+    // Jika pesanan masih berstatus waiting_payment (atau expired untuk rescue pesanan yang dananya sudah masuk ke GoPay)
+    if (order.status === "waiting_payment" || order.status === "expired") {
+      const gateway = (order as any).paymentGateway || "midtrans";
 
-      if (shouldCheckMidtrans) {
-        midtransCheckThrottle.set(orderNumber, now);
-        try {
-          const midtransStatus = await midtransService.getTransactionStatus(orderNumber);
-          const txStatus = midtransStatus.transactionStatus;
-          const fraudStatus = midtransStatus.fraudStatus;
+      if (gateway === "gopay") {
+        // 1. Cabang GoPay Merchant Gateway
+        const now = Date.now();
+        const lastCheck = midtransCheckThrottle.get(orderNumber) || 0;
+        const shouldCheckGopay = forceSync || (now - lastCheck >= 3000); // Throttle 3 detik untuk GoPay
 
-          if (txStatus === "settlement" || (txStatus === "capture" && fraudStatus === "accept")) {
-            // Eksekusi pemrosesan pembayaran dan pesanan
-            const res = await this.handlePaymentSettlement(orderNumber, midtransStatus.raw);
-            return this.attachExpiryToOrder(res.order);
-          } else if (txStatus === "expire" || txStatus === "cancel" || txStatus === "deny") {
-            await this.handlePaymentFailure(orderNumber, txStatus, midtransStatus.raw);
-            const updated = await db.query.orders.findFirst({
-              where: eq(orders.id, order.id),
-              with: { items: true, payments: true, deliveries: true },
+        if (shouldCheckGopay) {
+          midtransCheckThrottle.set(orderNumber, now);
+          try {
+            // Ambil daftar transactionId yang sudah settlement untuk mencegah double claim
+            const settledPayments = await db.query.payments.findMany({
+              where: eq(payments.status, "settlement"),
+              columns: { transactionId: true },
             });
-            return this.attachExpiryToOrder(updated);
+            const claimedSet = new Set(
+              settledPayments
+                .map((p) => p.transactionId)
+                .filter(Boolean) as string[]
+            );
+
+            const matchedTx = await gopayService.verifyPayment(
+              order.totalAmount,
+              order.createdAt,
+              claimedSet
+            );
+
+            if (matchedTx) {
+              console.log(`✅ [GoPay Verified] Pembayaran mutasi masuk untuk order #${orderNumber} (TX: ${matchedTx.id}, Rp ${matchedTx.amount})`);
+              const res = await this.handlePaymentSettlement(
+                orderNumber,
+                matchedTx.raw,
+                matchedTx.id
+              );
+              return this.attachExpiryToOrder(res.order);
+            }
+          } catch (err: any) {
+            console.warn(`⚠️ Pengecekan GoPay mutasi untuk ${orderNumber} tertunda:`, err.message);
           }
-        } catch (err: any) {
-          console.warn(`⚠️ Pengecekan Midtrans status untuk ${orderNumber} tertunda:`, err.message);
+        }
+      } else if (order.status === "waiting_payment") {
+        // 2. Cabang Midtrans Gateway
+        const now = Date.now();
+        const lastCheck = midtransCheckThrottle.get(orderNumber) || 0;
+        const shouldCheckMidtrans = forceSync || (now - lastCheck >= MIDTRANS_THROTTLE_MS);
+
+        if (shouldCheckMidtrans) {
+          midtransCheckThrottle.set(orderNumber, now);
+          try {
+            const midtransStatus = await midtransService.getTransactionStatus(orderNumber);
+            const txStatus = midtransStatus.transactionStatus;
+            const fraudStatus = midtransStatus.fraudStatus;
+
+            if (txStatus === "settlement" || (txStatus === "capture" && fraudStatus === "accept")) {
+              const res = await this.handlePaymentSettlement(orderNumber, midtransStatus.raw);
+              return this.attachExpiryToOrder(res.order);
+            } else if (txStatus === "expire" || txStatus === "cancel" || txStatus === "deny") {
+              await this.handlePaymentFailure(orderNumber, txStatus, midtransStatus.raw);
+              const updated = await db.query.orders.findFirst({
+                where: eq(orders.id, order.id),
+                with: { items: true, payments: true, deliveries: true },
+              });
+              return this.attachExpiryToOrder(updated);
+            }
+          } catch (err: any) {
+            console.warn(`⚠️ Pengecekan Midtrans status untuk ${orderNumber} tertunda:`, err.message);
+          }
         }
       }
 
-      // Cek apakah batas waktu QRIS (expiry_time) sudah kadaluarsa secara riil
-      const latestPayment = order.payments && order.payments.length > 0 ? order.payments[order.payments.length - 1] : null;
-      const expiryIso = parseMidtransExpiry(latestPayment?.rawCallback);
-      if (expiryIso && new Date(expiryIso).getTime() < Date.now()) {
-        await this.handlePaymentFailure(orderNumber, "expire", {
-          status_code: "407",
-          transaction_status: "expire",
-          status_message: "Batas waktu pembayaran QRIS telah habis (Expired)",
-          expiry_time: expiryIso,
-        });
-        const updated = await db.query.orders.findFirst({
-          where: eq(orders.id, order.id),
-          with: { items: true, payments: true, deliveries: true },
-        });
-        return this.attachExpiryToOrder(updated);
+      // Cek apakah batas waktu QRIS sudah kadaluarsa secara riil (hanya jika order masih waiting_payment)
+      if (order.status === "waiting_payment") {
+        const latestPayment = order.payments && order.payments.length > 0 ? order.payments[order.payments.length - 1] : null;
+        const expiryIso = parseMidtransExpiry(latestPayment?.rawCallback, order.createdAt);
+        if (expiryIso && new Date(expiryIso).getTime() < Date.now()) {
+          await this.handlePaymentFailure(orderNumber, "expire", {
+            status_code: "407",
+            transaction_status: "expire",
+            status_message: "Batas waktu pembayaran QRIS telah habis (Expired)",
+            expiry_time: expiryIso,
+          });
+          const updated = await db.query.orders.findFirst({
+            where: eq(orders.id, order.id),
+            with: { items: true, payments: true, deliveries: true },
+          });
+          return this.attachExpiryToOrder(updated);
+        }
       }
     }
 
@@ -915,10 +1069,81 @@ export class OrderService {
     return this.attachExpiryToOrder(order);
   }
 
+  /**
+   * Mengalihkan pesanan GoPay yang sedang bermasalah/kadaluarsa ke Midtrans Fallback
+   */
+  async switchToMidtransFallback(orderNumber: string) {
+    const order = await db.query.orders.findFirst({
+      where: eq(orders.orderNumber, orderNumber),
+      with: { items: true, payments: true, deliveries: true },
+    });
+
+    if (!order) throw new Error("Pesanan tidak ditemukan");
+    if (order.status !== "waiting_payment") {
+      throw new Error(`Pesanan berstatus '${order.status}', tidak dapat beralih metode pembayaran.`);
+    }
+
+    // Jika sudah menggunakan Midtrans, kembalikan data langsung
+    if ((order as any).paymentGateway === "midtrans") {
+      return this.attachExpiryToOrder(order);
+    }
+
+    console.log(`🔄 [Fallback Manual] Mengalihkan pesanan #${orderNumber} dari GoPay ke Midtrans...`);
+
+    // Kembalikan ke nominal asli tanpa kode unik
+    const originalAmount = Math.max(0, order.totalAmount - ((order as any).uniqueCode || 0));
+    const firstItem = order.items?.[0];
+
+    const midtransItems = [
+      {
+        id: String(firstItem?.productId || "ITEM-1"),
+        name: firstItem?.productName || "Produk Digital",
+        price: originalAmount,
+        quantity: 1,
+      },
+    ];
+
+    const qrisCharge = await midtransService.createQrisCharge({
+      orderNumber: order.orderNumber,
+      grossAmount: originalAmount,
+      customerPhone: order.customerPhone || "081200000000",
+      customerEmail: order.customerEmail || undefined,
+      items: midtransItems,
+    });
+
+    await db
+      .update(orders)
+      .set({
+        totalAmount: originalAmount,
+        uniqueCode: 0,
+        paymentGateway: "midtrans",
+      })
+      .where(eq(orders.id, order.id));
+
+    await db
+      .update(payments)
+      .set({
+        transactionId: qrisCharge.transactionId,
+        paymentMethod: "midtrans_qris",
+        qrCodeUrl: qrisCharge.qrCodeUrl,
+        qrString: qrisCharge.qrString,
+        status: "pending",
+        rawCallback: qrisCharge.raw,
+      })
+      .where(eq(payments.orderId, order.id));
+
+    const updated = await db.query.orders.findFirst({
+      where: eq(orders.id, order.id),
+      with: { items: true, payments: true, deliveries: true },
+    });
+
+    return this.attachExpiryToOrder(updated);
+  }
+
   attachExpiryToOrder(order: any) {
     if (order && Array.isArray(order.payments)) {
       for (const p of order.payments) {
-        p.expiryTime = parseMidtransExpiry(p.rawCallback);
+        p.expiryTime = parseMidtransExpiry(p.rawCallback, order.createdAt);
       }
     }
     return order;

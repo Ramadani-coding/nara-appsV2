@@ -2,6 +2,7 @@ import { app } from "./app.js";
 import { startAutoSyncWorker, stopAutoSyncWorker } from "./workers/autoSyncWorker.js";
 import { startOrderQueueWorker, stopOrderQueueWorker } from "./workers/orderQueueWorker.js";
 import { redisConnection, initRedis, closeRedisConnection } from "./lib/redis.js";
+import { gopayService } from "./services/gopay.service.js";
 import "dotenv/config";
 
 const DEFAULT_PORT = Number(process.env.PORT) || 5001;
@@ -20,6 +21,19 @@ function startServer(port: number) {
 
     // Aktifkan background queue worker untuk antrean checkout order
     startOrderQueueWorker();
+
+    // Background job: Auto-refresh token GoPay Merchant setiap 6 jam
+    setInterval(async () => {
+      try {
+        const session = gopayService.loadSession();
+        if (session && session.refresh_token && gopayService.isSessionExpired(session)) {
+          console.log("🔄 [GoPay Periodic] Memperbarui sesi token GoPay...");
+          await gopayService.refreshSession();
+        }
+      } catch (err: any) {
+        console.warn("⚠️ [GoPay Periodic] Gagal auto refresh:", err.message);
+      }
+    }, 6 * 60 * 60 * 1000);
   });
 
   server.on("error", (err: any) => {

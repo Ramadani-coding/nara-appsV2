@@ -14,6 +14,10 @@
 .env.production.local
 backend/.env
 frontend/.env
+*.gopay*
+.gopay_session.json
+backend/.gopay_session.json
+.GOPAY_SESI_JANGAN_DIHAPUS.json
 
 # Pengecualian: Pastikan template contoh (.env.example) tetap ter-upload
 !.env.example

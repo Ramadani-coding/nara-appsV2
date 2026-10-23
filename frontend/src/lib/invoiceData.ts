@@ -276,7 +276,7 @@ export async function findInvoiceAsync(query: string, options?: FindInvoiceOptio
       // 2. Cek apakah status payment adalah expire atau cancel
       else if (latestPayment?.status === 'expire' || rawCb?.transaction_status === 'expire') {
         invoiceStatus = 'KADALUARSA';
-        failureReason = 'Batas waktu pembayaran QRIS di Midtrans telah habis (Expired).';
+        failureReason = 'Batas waktu pembayaran QRIS telah habis (Expired).';
       } 
       else if (latestPayment?.status === 'cancel' || rawCb?.transaction_status === 'cancel') {
         invoiceStatus = 'KADALUARSA';

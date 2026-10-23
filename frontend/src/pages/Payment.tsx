@@ -1,18 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams, useLocation, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   QrCode, 
   Loader2, 
   CheckCircle2, 
-  ShieldCheck, 
   Copy, 
   Check, 
   Clock, 
   RefreshCw, 
   AlertTriangle,
-  ArrowLeft
-} from 'lucide-react';
+  ArrowLeft,
+  HelpCircle
+} from 'lucide-react'; 
 import { 
   getBackendOrder, 
   checkBackendPaymentStatus, 
@@ -68,6 +68,8 @@ export default function Payment() {
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [status, setStatus] = useState<'pending' | 'verifying' | 'success' | 'failed'>('pending');
   const [copied, setCopied] = useState(false);
+  const [copiedAmount, setCopiedAmount] = useState(false);
+  const [showUniqueCodeInfo, setShowUniqueCodeInfo] = useState(false);
   const [targetExpiryTime, setTargetExpiryTime] = useState<number | null>(() => {
     if (initialExpiryParam) return parseExpiryTimestamp(initialExpiryParam);
     if (initialOrderData?.payment?.expiryTime) return parseExpiryTimestamp(initialOrderData.payment.expiryTime);
@@ -84,9 +86,9 @@ export default function Payment() {
       if (data) {
         setOrder(data);
 
-        // Ambil batas waktu riil yang diberikan Midtrans
+        // Ambil batas waktu riil yang diberikan Midtrans / GoPay
         const paymentRecord = data.payments?.[0];
-        const expiryRaw = paymentRecord?.expiryTime || (paymentRecord as any)?.rawCallback?.expiry_time;
+        const expiryRaw = paymentRecord?.expiryTime || (paymentRecord as any)?.rawCallback?.expiresAt || (paymentRecord as any)?.rawCallback?.expiry_time;
         const targetTs = parseExpiryTimestamp(expiryRaw, data.createdAt);
 
         if (targetTs) {
@@ -94,7 +96,7 @@ export default function Payment() {
           const remainingSec = Math.max(0, Math.floor((targetTs - Date.now()) / 1000));
           setTimeLeft(remainingSec);
 
-          // Jika waktu riil dari Midtrans sudah terlewat dan order belum lunas
+          // Jika waktu riil sudah terlewat dan order belum lunas
           if (remainingSec <= 0 && data.status === 'waiting_payment') {
             setStatus('failed');
             setErrorMessage('Batas waktu pembayaran resmi telah habis (Expired). Kode QRIS ini telah dinonaktifkan.');
@@ -119,7 +121,7 @@ export default function Payment() {
     fetchOrderData();
   }, [fetchOrderData]);
 
-  // 2. Countdown timer pembayaran berbasis batas waktu riil Midtrans
+  // 2. Countdown timer pembayaran berbasis batas waktu riil Midtrans / GoPay
   useEffect(() => {
     if (!targetExpiryTime || status === 'success' || status === 'failed') return;
 
@@ -155,7 +157,16 @@ export default function Payment() {
     }
   };
 
-  // 3. Polling status otomatis ke backend & sinkronisasi Midtrans Core API setiap 3.5 detik
+  const copyAmount = () => {
+    const amountVal = order?.totalAmount ?? Number(initialAmount);
+    if (amountVal) {
+      navigator.clipboard.writeText(amountVal.toString());
+      setCopiedAmount(true);
+      setTimeout(() => setCopiedAmount(false), 2000);
+    }
+  };
+
+  // 3. Polling status otomatis ke backend & sinkronisasi status setiap 3.5 detik
   useEffect(() => {
     if (!orderId || status === 'success' || status === 'failed') return;
 
@@ -253,6 +264,10 @@ export default function Payment() {
   const displayQty = order?.items?.[0]?.quantity ?? Number(initialQty);
   const displayPhone = order?.customerPhone ?? initialPhone;
   const displayEmail = order?.customerEmail ?? initialEmail;
+  const displayItem = order?.items?.[0];
+  const displayUnitPrice = displayItem?.price 
+    ? displayItem.price 
+    : (displayQty > 0 ? Math.floor((displayAmount - (order?.uniqueCode || 0) + (order?.discountAmount || 0)) / displayQty) : 0);
   const paymentRecord = order?.payments?.[0];
   const qrCodeUrl = paymentRecord?.qrCodeUrl || initialOrderData?.payment?.qrCodeUrl;
 
@@ -275,9 +290,6 @@ export default function Payment() {
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Kembali</span>
           </button>
-          <span className="px-3 py-1 bg-brand-yellow text-black font-black text-xs uppercase border-2 border-black shadow-[2px_2px_0px_#000] rounded-lg inline-block">
-            PEMBAYARAN RESMI QRIS
-          </span>
         </div>
         <h1 className="text-2xl sm:text-3xl font-black text-black dark:text-white">
           Scan QRIS untuk Bayar
@@ -399,11 +411,7 @@ export default function Payment() {
                 )}
               </div>
 
-              <div className="mt-3 text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-gray-600 dark:text-gray-300 flex items-center gap-1 text-center">
-                <ShieldCheck className="w-3.5 h-3.5 text-brand-blue shrink-0" />
-                <span>NMID: ID1020039281920 (NARA DIGITAL STORE)</span>
-              </div>
-              <div className="mt-1 text-[10px] font-bold text-amber-800 dark:text-amber-300 text-center">
+              <div className="mt-5 text-[10px] font-bold text-amber-800 dark:text-amber-300 text-center">
                 🔒 Kode QRIS hanya dapat digunakan untuk 1x transaksi pembayaran.
               </div>
             </>
@@ -426,17 +434,26 @@ export default function Payment() {
             </div>
           </div>
 
-          <div className="flex justify-between items-center">
-            <span className="text-gray-500 dark:text-gray-400 uppercase">Produk</span>
-            <span className="text-black dark:text-white font-black truncate max-w-[200px] text-right">{displayProduct}</span>
+          <div className="flex justify-between items-center gap-2">
+            <span className="text-gray-500 dark:text-gray-400 uppercase shrink-0">Produk</span>
+            <span className="text-black dark:text-white font-black truncate max-w-[200px] text-right" title={displayProduct}>
+              {displayProduct}
+            </span>
           </div>
 
-          {displayQty > 1 && (
+          {displayUnitPrice > 0 && (
             <div className="flex justify-between items-center">
-              <span className="text-gray-500 dark:text-gray-400 uppercase">Jumlah (Qty)</span>
-              <span className="text-black dark:text-white font-black">{displayQty} Pcs</span>
+              <span className="text-gray-500 dark:text-gray-400 uppercase">Harga Satuan</span>
+              <span className="text-black dark:text-white font-black font-mono">
+                Rp {displayUnitPrice.toLocaleString('id-ID')}
+              </span>
             </div>
           )}
+
+          <div className="flex justify-between items-center">
+            <span className="text-gray-500 dark:text-gray-400 uppercase">Jumlah (Qty)</span>
+            <span className="text-black dark:text-white font-black">{displayQty} Pcs</span>
+          </div>
 
           {displayPhone && (
             <div className="flex justify-between items-center">
@@ -452,11 +469,104 @@ export default function Payment() {
             </div>
           )}
 
+          {Boolean(order?.uniqueCode) && (
+            <div className="bg-amber-50/90 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800/80 rounded-xl p-3 transition-all duration-200">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="uppercase text-[11px] sm:text-xs font-black text-amber-900 dark:text-amber-200 tracking-wide">
+                    Kode Unik Verifikasi
+                  </span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowUniqueCodeInfo((prev) => !prev);
+                    }}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-200/90 hover:bg-amber-300 dark:bg-amber-900/70 dark:hover:bg-amber-800 text-amber-900 dark:text-amber-200 text-[10px] sm:text-[11px] font-bold cursor-pointer transition-all shadow-xs active:scale-95"
+                    title="Klik untuk melihat penjelasan kode unik"
+                    aria-label="Apa itu kode unik verifikasi?"
+                  >
+                    <HelpCircle className="w-3.5 h-3.5 text-amber-700 dark:text-amber-300 shrink-0" />
+                    <span>{showUniqueCodeInfo ? 'Tutup' : 'Apa ini?'}</span>
+                  </button>
+                </div>
+                <span className="font-mono font-black text-xs sm:text-sm text-amber-900 dark:text-amber-300 shrink-0">
+                  +{order?.uniqueCode}
+                </span>
+              </div>
+
+              <AnimatePresence>
+                {showUniqueCodeInfo && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.22, ease: 'easeOut' }}
+                    className="overflow-hidden"
+                  >
+                    <div className="mt-3 pt-2.5 border-t border-amber-200/90 dark:border-amber-800/80 text-xs leading-relaxed text-stone-800 dark:text-stone-200 space-y-2">
+                      <div className="p-3 bg-white/95 dark:bg-[#141724] rounded-lg border border-amber-200 dark:border-amber-900/60 space-y-2 shadow-xs">
+                        <p className="text-amber-950 dark:text-amber-100 font-bold text-xs">
+                          💡 Kenapa ada tambahan nominal (+{order?.uniqueCode})?
+                        </p>
+                        <p className="text-[11px] sm:text-xs text-stone-700 dark:text-stone-300 leading-normal">
+                          Nomor kecil acak ini adalah <strong>tanda pengenal otomatis</strong> pembayaranmu. Fungsinya agar sistem langsung tahu uang yang masuk adalah untuk pesananmu di antara banyaknya transaksi lain yang masuk bersamaan.
+                        </p>
+
+                        <div className="grid grid-cols-1 gap-1.5 pt-1 text-[11px]">
+                          <div className="flex items-start gap-1.5 bg-emerald-50 dark:bg-emerald-950/40 p-2 rounded border border-emerald-200 dark:border-emerald-800/60 text-emerald-900 dark:text-emerald-200">
+                            <span className="font-bold text-emerald-600 dark:text-emerald-400 shrink-0">✓</span>
+                            <span><strong>Otomatis Lunas:</strong> Kamu tidak perlu repot kirim foto bukti transfer ke admin.</span>
+                          </div>
+                          <div className="flex items-start gap-1.5 bg-emerald-50 dark:bg-emerald-950/40 p-2 rounded border border-emerald-200 dark:border-emerald-800/60 text-emerald-900 dark:text-emerald-200">
+                            <span className="font-bold text-emerald-600 dark:text-emerald-400 shrink-0">✓</span>
+                            <span><strong>Pengiriman Detik Itu Juga:</strong> Akun/pesanan langsung otomatis dikirim ke WhatsApp kamu setelah bayar.</span>
+                          </div>
+                          <div className="flex items-start gap-1.5 bg-blue-50 dark:bg-blue-950/40 p-2 rounded border border-blue-200 dark:border-blue-800/60 text-blue-900 dark:text-blue-200">
+                            <span className="font-bold text-blue-600 dark:text-blue-400 shrink-0">✨</span>
+                            <span><strong>Sudah Pas Saat Scan:</strong> Saat kamu scan QRIS di atas lewat GoPay, BCA, OVO, DANA, atau m-Banking lain, nominalnya sudah otomatis terisi pas sampai 3 angka terakhir tanpa perlu kamu ketik manual.</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end items-center pt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => setShowUniqueCodeInfo(false)}
+                          className="text-[11px] font-bold text-amber-800 hover:text-amber-950 dark:text-amber-300 dark:hover:text-amber-100 underline cursor-pointer"
+                        >
+                          Mengerti, tutup info ✕
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+
           <div className="border-t-2 border-black dark:border-gray-700 pt-2 flex justify-between items-center text-sm">
-            <span className="font-black uppercase text-black dark:text-white">Total Bayar</span>
-            <span className="font-black text-lg text-brand-blue whitespace-nowrap">
-              Rp {displayAmount.toLocaleString('id-ID')}
-            </span>
+            <div>
+              <span className="font-black uppercase text-black dark:text-white block">Total Bayar</span>
+              {Boolean(order?.uniqueCode) && (
+                <span className="text-[10px] text-rose-600 dark:text-rose-400 font-bold block">
+                  *Wajib transfer persis hingga 3 digit terakhir
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="font-black text-lg text-brand-blue whitespace-nowrap">
+                Rp {displayAmount.toLocaleString('id-ID')}
+              </span>
+              <button
+                onClick={copyAmount}
+                className="p-1.5 bg-white dark:bg-[#181C2A] border border-black dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer rounded flex items-center gap-1 text-[11px] font-bold"
+                title="Salin Nominal Pembayaran Tepat"
+              >
+                {copiedAmount ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5 text-black dark:text-white" />}
+                <span className="hidden sm:inline">{copiedAmount ? 'Tersalin' : 'Salin'}</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -473,7 +583,7 @@ export default function Payment() {
           <div className="space-y-3">
             <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border-2 border-black dark:border-gray-700 flex items-center justify-center gap-2 text-xs font-black text-amber-900 dark:text-amber-200 rounded-xl">
               <Loader2 className="w-4 h-4 animate-spin text-black dark:text-white" />
-              <span>MENUNGGU PEMBAYARAN VIA QRIS...</span>
+              <span>MENUNGGU PEMBAYARAN...</span>
             </div>
 
             {/* Manual Check Button */}

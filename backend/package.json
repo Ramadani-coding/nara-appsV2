@@ -20,9 +20,12 @@
     "test:gowa": "tsx src/scripts/test-gowa.ts",
     "test:bot": "tsx src/scripts/test-bot-flow.ts",
     "test:rate-limit": "tsx src/scripts/test-rate-limit.ts",
-    "test:webhook": "tsx src/scripts/test-webhook-whatsapp.ts"
+    "test:webhook": "tsx src/scripts/test-webhook-whatsapp.ts",
+    "gopay:login": "tsx src/scripts/gopay-login.ts",
+    "gopay:test": "tsx src/scripts/test-gopay-status.ts"
   },
   "dependencies": {
+    "axios": "^1.20.0",
     "bullmq": "^6.3.11",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
@@ -31,13 +34,15 @@
     "express": "^4.21.2",
     "express-rate-limit": "^8.7.0",
     "ioredis": "^6.0.0",
-    "postgres": "^3.4.5"
+    "postgres": "^3.4.5",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/exceljs": "^0.5.3",
     "@types/express": "^4.17.21",
     "@types/node": "^22.13.1",
+    "@types/qrcode": "^1.5.6",
     "drizzle-kit": "^0.31.8",
     "tsx": "^4.19.3",
     "typescript": "^5.7.3"

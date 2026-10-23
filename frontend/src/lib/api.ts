@@ -389,6 +389,8 @@ export interface BackendOrderDetail {
   customerEmail?: string;
   status: "waiting_payment" | "paid" | "processing" | "completed" | "failed";
   totalAmount: number;
+  uniqueCode?: number;
+  paymentGateway?: "gopay" | "midtrans";
   voucherId?: number | null;
   voucherCode?: string | null;
   discountAmount?: number;
@@ -409,6 +411,7 @@ export interface BackendOrderDetail {
     transactionId: string;
     paymentMethod: string;
     qrCodeUrl: string | null;
+    qrString?: string | null;
     status: string;
     settledAt?: string;
     expiryTime?: string | null;
@@ -666,6 +669,27 @@ export async function checkBackendPaymentStatus(orderNumber: string): Promise<an
   const json = await res.json();
   if (!res.ok || !json.success) {
     throw new Error(json.message || "Gagal memeriksa status pembayaran");
+  }
+
+  return json.data;
+}
+
+/**
+ * Mengalihkan pesanan ke pembayaran cadangan Midtrans QRIS jika GoPay mengalami kendala
+ */
+export async function switchToMidtransFallback(orderNumber: string): Promise<any> {
+  const cleanNum = orderNumber.trim().replace(/^#/, "");
+  const res = await fetch(`${API_BASE_URL}/payments/${encodeURIComponent(cleanNum)}/switch-fallback`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+  });
+
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.message || "Gagal beralih ke pembayaran cadangan");
   }
 
   return json.data;
