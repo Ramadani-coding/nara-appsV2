@@ -8,14 +8,29 @@ import paymentRoutes from "./payment.routes.js";
 import botRoutes from "./bot.routes.js";
 import webhookRoutes from "./webhook.routes.js";
 import { publicVoucherRouter, adminVoucherRouter } from "./voucher.routes.js";
+import { gopayService } from "../services/gopay.service.js";
 
 const apiRouter = Router();
 
 apiRouter.get("/health", (_req, res) => {
+  const gopayReady = gopayService.isAvailable();
   res.json({
     status: "ok",
     timestamp: new Date().toISOString(),
     service: "Nara Digital Store API",
+    gateways: {
+      activePrimary: gopayReady ? "gopay" : "midtrans (gopay offline/unconfigured)",
+      gopay: {
+        isAvailable: gopayReady,
+        hasStaticQr: Boolean(gopayService.getStaticQrString()),
+        hasSession: Boolean(gopayService.loadSession()?.access_token),
+        sessionFilePath: gopayService.getSessionFilePath(),
+      },
+      midtrans: {
+        isConfigured: Boolean(process.env.MIDTRANS_SERVER_KEY),
+        isProduction: process.env.MIDTRANS_IS_PRODUCTION === "true",
+      },
+    },
   });
 });
 

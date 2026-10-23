@@ -3,7 +3,7 @@ import { orders } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 
 async function run() {
-  const target = "ORD-3602722497";
+  const target = "ORD-5298521068";
   const order = await db.query.orders.findFirst({
     where: eq(orders.orderNumber, target),
     with: {

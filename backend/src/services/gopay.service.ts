@@ -48,20 +48,58 @@ class GopayService {
   // 1. SESSION MANAGEMENT (GoBiz Go-ID Auth)
   // =========================================================================
 
+  public getStaticQrString(): string {
+    return (process.env.GOPAY_QRIS_STATIC || process.env.QRIS_STATIC || this.staticQrString || "").trim();
+  }
+
   public getSessionFilePath(): string {
-    return this.sessionFilePath;
+    return this.resolveSessionFilePath();
+  }
+
+  private resolveSessionFilePath(): string {
+    if (process.env.GOPAY_SESSION_PATH) {
+      return path.resolve(process.env.GOPAY_SESSION_PATH);
+    }
+    const candidates = [
+      this.sessionFilePath,
+      path.resolve(process.cwd(), ".gopay_session.json"),
+      path.resolve(process.cwd(), "backend", ".gopay_session.json"),
+      path.resolve(process.cwd(), "..", ".gopay_session.json"),
+    ];
+    for (const c of candidates) {
+      if (fs.existsSync(c)) {
+        return c;
+      }
+    }
+    return candidates[0];
   }
 
   public loadSession(): GoPaySession | null {
     try {
-      if (!fs.existsSync(this.sessionFilePath)) {
+      // 1. Dukung pembacaan sesi langsung dari Environment Variable GOPAY_SESSION_JSON
+      // (Sangat berguna di hosting production / cloud tanpa perlu upload file manual)
+      if (process.env.GOPAY_SESSION_JSON) {
+        try {
+          const session = JSON.parse(process.env.GOPAY_SESSION_JSON);
+          if (session && session.access_token) {
+            return session;
+          }
+        } catch (envJsonErr: any) {
+          console.warn("⚠️ [GoPay] GOPAY_SESSION_JSON pada .env tidak berformat JSON valid:", envJsonErr.message);
+        }
+      }
+
+      // 2. Cek lokasi file di disk
+      const targetPath = this.resolveSessionFilePath();
+      if (!fs.existsSync(targetPath)) {
         return null;
       }
-      const raw = fs.readFileSync(this.sessionFilePath, "utf-8");
+      const raw = fs.readFileSync(targetPath, "utf-8");
       const session = JSON.parse(raw);
       if (!session || !session.access_token) {
         return null;
       }
+      this.sessionFilePath = targetPath;
       return session;
     } catch (err: any) {
       console.warn("⚠️ Gagal membaca berkas sesi GoPay:", err.message);
@@ -71,16 +109,18 @@ class GopayService {
 
   public saveSession(session: GoPaySession): void {
     try {
-      const dir = path.dirname(this.sessionFilePath);
+      const targetPath = this.resolveSessionFilePath();
+      const dir = path.dirname(targetPath);
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
       }
       session.updated_at = new Date().toISOString();
-      fs.writeFileSync(this.sessionFilePath, JSON.stringify(session, null, 2), {
+      fs.writeFileSync(targetPath, JSON.stringify(session, null, 2), {
         encoding: "utf-8",
         mode: 0o600, // Secure file permissions (owner read/write only)
       });
-      console.log("✅ Sesi GoPay Merchant berhasil disimpan ke:", this.sessionFilePath);
+      this.sessionFilePath = targetPath;
+      console.log("✅ Sesi GoPay Merchant berhasil disimpan ke:", targetPath);
     } catch (err: any) {
       console.error("❌ Gagal menyimpan sesi GoPay:", err.message);
     }
@@ -205,9 +245,18 @@ class GopayService {
   }
 
   public isAvailable(): boolean {
-    const hasStatic = Boolean(this.staticQrString && this.staticQrString.startsWith("00020101"));
+    const staticQr = this.getStaticQrString();
+    const hasStatic = Boolean(staticQr && staticQr.startsWith("00020101"));
     const session = this.loadSession();
     const hasToken = Boolean(session && session.access_token);
+
+    if (!hasStatic) {
+      console.warn("⚠️ [GoPay Gateway] Tidak aktif: GOPAY_QRIS_STATIC belum disetel di .env (wajib diawali '00020101').");
+    }
+    if (!hasToken) {
+      console.warn("⚠️ [GoPay Gateway] Tidak aktif: Sesi GoPay (.gopay_session.json atau GOPAY_SESSION_JSON) belum ditemukan di server.");
+    }
+
     return hasStatic && hasToken;
   }
 
@@ -234,8 +283,9 @@ class GopayService {
    * Mengubah QRIS Statis menjadi QRIS Dinamis standar EMVCo dengan menyuntikkan nominal
    */
   public generateDynamicQRIS(amount: number): string | null {
-    if (!this.staticQrString) return null;
-    let payload = this.staticQrString.trim();
+    const staticQr = this.getStaticQrString();
+    if (!staticQr) return null;
+    let payload = staticQr.trim();
 
     // Hapus Tag 63 (CRC lama) jika ada
     const idx63 = payload.indexOf("6304");
