@@ -24,12 +24,17 @@ app.use(cors({
       return callback(null, true);
     }
 
-    // 3. Di mode production, pastikan origin terdaftar di FRONTEND_URL
-    if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+    // 3. Di mode production, izinkan domain resmi yang terdaftar
+    if (
+      allowedOrigins.length === 0 ||
+      allowedOrigins.includes(origin) ||
+      allowedOrigins.some((allowed) => origin === allowed || origin.endsWith("." + allowed.replace(/^https?:\/\//, "")))
+    ) {
       return callback(null, true);
     }
 
-    return callback(new Error(`CORS policy violation: Origin ${origin} not allowed`), false);
+    // Blokir CORS secara elegan tanpa melempar crash exception HTML
+    return callback(null, false);
   },
   credentials: true,
 }));
@@ -55,11 +60,21 @@ app.use("/api", globalApiLimiter);
 // API Routes
 app.use("/api", apiRouter);
 
-// 404 Handler
+// 404 Handler (JSON)
 app.use((_req, res) => {
   res.status(404).json({
     success: false,
     message: "Endpoint not found",
+  });
+});
+
+// Global Error Handler (Garansi 100% respon selalu format JSON, bukan HTML!)
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error("❌ [GlobalErrorHandler]:", err?.message || err);
+  const status = typeof err?.status === "number" ? err.status : 500;
+  res.status(status).json({
+    success: false,
+    message: err?.message || "Terjadi kesalahan internal pada server",
   });
 });
 

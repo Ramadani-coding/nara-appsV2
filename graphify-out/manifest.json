@@ -66,9 +66,9 @@
     "semantic_hash": ""
   },
   "backend/src/app.ts": {
-    "mtime": 1792766209.6002939,
-    "seen": 1792766317.1978595,
-    "ast_hash": "d5ca7db9ab77c2ba8472c2a1475ee48c",
+    "mtime": 1792767763.7367616,
+    "seen": 1792767963.1974657,
+    "ast_hash": "eb66a4a2980902781f26f182ed8e936e",
     "semantic_hash": ""
   },
   "backend/src/db/index.ts": {
@@ -546,9 +546,9 @@
     "semantic_hash": "6223f07bc7d769732796b3e50514ddd0"
   },
   "frontend/src/lib/api.ts": {
-    "mtime": 1792749852.5329256,
-    "seen": 1792750106.1397264,
-    "ast_hash": "10b1be9eafe7e3d6497fb752e2b85762",
+    "mtime": 1792767854.5558915,
+    "seen": 1792767963.284938,
+    "ast_hash": "b9bdcf3f992db45abb007225dc5ea975",
     "semantic_hash": ""
   },
   "frontend/src/lib/invoiceData.ts": {

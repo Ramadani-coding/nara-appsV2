@@ -428,6 +428,31 @@ export interface BackendOrderDetail {
 }
 
 /**
+ * Helper pembaca response JSON yang tangguh.
+ * Menangani respon HTML (502 / 404 / 500 / CORS error) dan memberikan pesan kesalahan yang jelas & informatif.
+ */
+export async function safeReadJson<T = any>(res: Response): Promise<T> {
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch (_err) {
+    if (!res.ok) {
+      if (res.status === 404) {
+        throw new Error("Endpoint API backend tidak ditemukan (HTTP 404). Periksa konfigurasi VITE_API_URL pada hosting frontend.");
+      }
+      if (res.status === 502 || res.status === 504) {
+        throw new Error(`Server backend tidak merespon (HTTP ${res.status} Bad Gateway). Pastikan server backend Node.js sedang berjalan di server.`);
+      }
+      if (res.status === 403) {
+        throw new Error("Akses ke API backend ditolak (HTTP 403 Forbidden). Pastikan FRONTEND_URL di file backend .env sudah memuat domain website ini.");
+      }
+      throw new Error(`Server backend mengalami kendala (HTTP ${res.status}). Mohon coba sesaat lagi.`);
+    }
+    throw new Error("Respon server tidak berformat JSON valid (menerima HTML). Pastikan VITE_API_URL pada frontend diarahkan ke endpoint backend yang tepat.");
+  }
+}
+
+/**
  * Membuat pesanan baru dan menghasilkan transaksi QRIS Midtrans Core API
  */
 export async function createBackendOrder(payload: CreateOrderPayload): Promise<BackendOrderResponse> {
@@ -440,7 +465,7 @@ export async function createBackendOrder(payload: CreateOrderPayload): Promise<B
     body: JSON.stringify(payload),
   });
 
-  const json = await res.json();
+  const json = await safeReadJson<BackendOrderResponse>(res);
   if (!res.ok || !json.success) {
     throw new Error(json.message || "Gagal membuat pesanan QRIS");
   }
@@ -510,7 +535,7 @@ export async function enqueueBackendOrder(payload: CreateOrderPayload): Promise<
     body: JSON.stringify(payload),
   });
 
-  const json = await res.json();
+  const json = await safeReadJson<QueueTicketResponse>(res);
   if (!res.ok || !json.success) {
     throw new Error(json.message || "Gagal memasukkan pesanan ke antrean");
   }
@@ -536,7 +561,7 @@ export async function getQueueTicketStatus(ticketId: string): Promise<QueueTicke
     },
   });
 
-  const json = await res.json();
+  const json = await safeReadJson<QueueTicketStatusResponse>(res);
   if (!res.ok || !json.success) {
     throw new Error(json.message || "Gagal memeriksa status antrean tiket");
   }
@@ -642,7 +667,7 @@ export async function verifyBackendOrderPhone(orderNumber: string, phone: string
       body: JSON.stringify({ phone }),
     });
 
-    const json = await res.json();
+    const json = await safeReadJson(res);
     if (json.success && json.token) {
       try {
         sessionStorage.setItem(`nara_session_token_${cleanNum}`, json.token);
@@ -666,7 +691,7 @@ export async function checkBackendPaymentStatus(orderNumber: string): Promise<an
     headers: { Accept: "application/json" },
   });
 
-  const json = await res.json();
+  const json = await safeReadJson(res);
   if (!res.ok || !json.success) {
     throw new Error(json.message || "Gagal memeriksa status pembayaran");
   }
@@ -687,7 +712,7 @@ export async function switchToMidtransFallback(orderNumber: string): Promise<any
     },
   });
 
-  const json = await res.json();
+  const json = await safeReadJson(res);
   if (!res.ok || !json.success) {
     throw new Error(json.message || "Gagal beralih ke pembayaran cadangan");
   }
