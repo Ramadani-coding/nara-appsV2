@@ -24,6 +24,7 @@ import AdminVouchers from "./pages/admin/AdminVouchers";
 import AdminAnalytics from "./pages/admin/AdminAnalytics";
 import AdminProfile from "./pages/admin/AdminProfile";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { AdBanner } from "./components/AdBanner";
 
 /**
  * Public Layout with Store Navbar & Footer
@@ -35,6 +36,7 @@ function PublicLayout() {
       <main className="flex-grow pt-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
         <Outlet />
       </main>
+      <AdBanner />
       <Footer />
     </div>
   );

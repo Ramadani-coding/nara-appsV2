@@ -132,9 +132,9 @@
     "semantic_hash": "4e5ce6f3eb0c461c67d5cf4d71113438"
   },
   "backend/src/routes/index.ts": {
-    "mtime": 1792148053.2440493,
-    "seen": 1792148103.1340675,
-    "ast_hash": "efe43f791a1fdb417612fde053ccbad9",
+    "mtime": 1792768799.6068594,
+    "seen": 1792807383.503689,
+    "ast_hash": "3d63ac468408ea8647b9409ec7b564e3",
     "semantic_hash": ""
   },
   "backend/src/routes/order.routes.ts": {
@@ -174,10 +174,10 @@
     "semantic_hash": "a4a8b9d2c8548f863c0c5b96038128d6"
   },
   "backend/src/scripts/check-order.ts": {
-    "mtime": 1789087580.3880782,
-    "seen": 1791595496.7429166,
-    "ast_hash": "684b67af927a665d345862056d06b7fc",
-    "semantic_hash": "684b67af927a665d345862056d06b7fc"
+    "mtime": 1792768883.090838,
+    "seen": 1792807383.5093796,
+    "ast_hash": "41fdb606dbfafd161d6e2878ad9d8eab",
+    "semantic_hash": ""
   },
   "backend/src/scripts/check-saldo.ts": {
     "mtime": 1788962343.5829072,
@@ -438,9 +438,9 @@
     "semantic_hash": "e982c2c626930cc50626fdb699902290"
   },
   "frontend/src/App.tsx": {
-    "mtime": 1791606463.9467967,
-    "seen": 1791607609.9729862,
-    "ast_hash": "838d4db903111c6143b8f8e3dc398beb",
+    "mtime": 1792807034.0094626,
+    "seen": 1792807383.5679939,
+    "ast_hash": "67f593e4536fe4cbb58fcdef64d11d93",
     "semantic_hash": ""
   },
   "frontend/src/components/AppLogo.tsx": {
@@ -522,10 +522,10 @@
     "semantic_hash": ""
   },
   "frontend/src/components/layout/Footer.tsx": {
-    "mtime": 1789550941.3874748,
-    "seen": 1791595496.7430336,
-    "ast_hash": "50753b6843c1f68702413f32fbca250d",
-    "semantic_hash": "50753b6843c1f68702413f32fbca250d"
+    "mtime": 1792807044.0041246,
+    "seen": 1792807383.593339,
+    "ast_hash": "b6d3048c6e54b0113323c614d54b85ca",
+    "semantic_hash": ""
   },
   "frontend/src/components/layout/Navbar.tsx": {
     "mtime": 1790137475.0470498,
@@ -1944,9 +1944,9 @@
     "semantic_hash": ""
   },
   "backend/src/services/gopay.service.ts": {
-    "mtime": 1792764395.4649084,
-    "seen": 1792764902.2770975,
-    "ast_hash": "19f1dddcfa8eb9b45c43fc0051add539",
+    "mtime": 1792768780.9906678,
+    "seen": 1792807383.5369756,
+    "ast_hash": "0ea1f594cbe4ea0d72f15081c1488f0a",
     "semantic_hash": ""
   },
   "backend/src/scripts/test-gopay-status.ts": {
@@ -1959,6 +1959,12 @@
     "mtime": 1792766477.8470507,
     "seen": 1792766517.3917637,
     "ast_hash": "cb43430d21a19b53e939c9b5df3c0a52",
+    "semantic_hash": ""
+  },
+  "frontend/src/components/AdBanner.tsx": {
+    "mtime": 1792808752.6604433,
+    "seen": 1792808860.200153,
+    "ast_hash": "40e9ee9820c21a56b19b3286fc20d8a1",
     "semantic_hash": ""
   }
 }
