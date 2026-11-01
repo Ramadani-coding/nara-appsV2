@@ -166,6 +166,48 @@ export class OrderService {
   }
 
   /**
+   * Menghasilkan kode unik 3 digit (100 - 999) yang dijamin belum terpakai
+   * oleh pesanan GoPay lain yang masih berstatus waiting_payment.
+   * Mencegah benturan nominal (nominal collision) antar pembeli.
+   */
+  async generateCollisionFreeUniqueCode(baseAmount: number): Promise<{ uniqueCode: number; finalTotalAmount: number }> {
+    const twentyMinutesAgo = new Date(Date.now() - 20 * 60 * 1000);
+    const activeOrders = await db.query.orders.findMany({
+      where: and(
+        eq(orders.status, "waiting_payment"),
+        eq(orders.paymentGateway, "gopay"),
+        gte(orders.createdAt, twentyMinutesAgo)
+      ),
+      columns: { totalAmount: true },
+    });
+
+    const occupiedAmounts = new Set<number>(
+      activeOrders.map((o) => o.totalAmount)
+    );
+
+    // Coba acak 30 kali untuk mendapatkan kode unik yang belum dipakai
+    for (let attempt = 0; attempt < 30; attempt++) {
+      const candidateCode = Math.floor(100 + Math.random() * 900);
+      const candidateTotal = baseAmount + candidateCode;
+      if (!occupiedAmounts.has(candidateTotal)) {
+        return { uniqueCode: candidateCode, finalTotalAmount: candidateTotal };
+      }
+    }
+
+    // Fallback berurutan jika 30 kali acak masih bentrok
+    for (let code = 100; code <= 999; code++) {
+      const candidateTotal = baseAmount + code;
+      if (!occupiedAmounts.has(candidateTotal)) {
+        return { uniqueCode: code, finalTotalAmount: candidateTotal };
+      }
+    }
+
+    // Kasus ekstrem jika 900 kombinasi penuh: gunakan 4 digit
+    const fallbackCode = Math.floor(1000 + Math.random() * 9000);
+    return { uniqueCode: fallbackCode, finalTotalAmount: baseAmount + fallbackCode };
+  }
+
+  /**
    * Membuat pesanan baru dan menghasilkan transaksi QRIS melalui Midtrans Core API
    */
   async createOrderWithQris(params: CreateOrderParams) {
@@ -357,11 +399,12 @@ export class OrderService {
 
       if (chosenGateway === "gopay") {
         try {
-          // Kode Unik 3 Digit (100 - 999) agar garansi 100% tidak ada nominal tabrakan
-          uniqueCode = Math.floor(100 + Math.random() * 900);
-          finalTotalAmount = totalAmount + uniqueCode;
+          // Kode Unik 3 Digit (100 - 999) dengan collision check terjamin bebas bentrok nominal
+          const codeResult = await this.generateCollisionFreeUniqueCode(totalAmount);
+          uniqueCode = codeResult.uniqueCode;
+          finalTotalAmount = codeResult.finalTotalAmount;
 
-          console.log(`💳 [GoPay Gateway] Menghasilkan QRIS Dinamis untuk Order #${newOrder.orderNumber} (Nominal: Rp ${finalTotalAmount}, Termasuk Kode Unik ${uniqueCode})...`);
+          console.log(`💳 [GoPay Gateway] Menghasilkan QRIS Dinamis untuk Order #${newOrder.orderNumber} (Nominal: Rp ${finalTotalAmount}, Termasuk Kode Unik Bebas-Tabrakan ${uniqueCode})...`);
           const qrisRes = await gopayService.createQrisCharge(finalTotalAmount, 15);
 
           // Update nominal akhir & kode unik di tabel orders
@@ -937,6 +980,40 @@ export class OrderService {
     let expiredCount = 0;
     for (const order of staleOrders) {
       try {
+        const gateway = (order as any).paymentGateway || "midtrans";
+        if (gateway === "gopay") {
+          // Lakukan pengecekan mutasi terakhir ke GoPay sebelum membatalkan
+          try {
+            const settledPayments = await db.query.payments.findMany({
+              where: eq(payments.status, "settlement"),
+              columns: { transactionId: true },
+            });
+            const claimedSet = new Set(
+              settledPayments
+                .map((p) => p.transactionId)
+                .filter(Boolean) as string[]
+            );
+
+            const matchedTx = await gopayService.verifyPayment(
+              order.totalAmount,
+              order.createdAt,
+              claimedSet
+            );
+
+            if (matchedTx) {
+              console.log(`✅ [ExpireStale Rescue] Pembayaran mutasi terdeteksi untuk pesanan #${order.orderNumber} (TX: ${matchedTx.id}, Rp ${matchedTx.amount}). Memproses pelunasan...`);
+              await this.handlePaymentSettlement(
+                order.orderNumber,
+                matchedTx.raw,
+                matchedTx.id
+              );
+              continue; // Batalkan proses expire jika sudah lunas
+            }
+          } catch (verifyErr: any) {
+            console.warn(`⚠️ [ExpireStale] Verifikasi akhir GoPay untuk #${order.orderNumber} tertunda:`, verifyErr.message);
+          }
+        }
+
         console.log(`⏱️ [ExpireStale] Membatalkan otomatis pesanan kadaluarsa #${order.orderNumber}...`);
         await this.handlePaymentFailure(order.orderNumber, "expire", {
           status_code: "407",

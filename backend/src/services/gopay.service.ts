@@ -76,31 +76,44 @@ class GopayService {
 
   public loadSession(): GoPaySession | null {
     try {
-      // 1. Dukung pembacaan sesi langsung dari Environment Variable GOPAY_SESSION_JSON
-      // (Sangat berguna di hosting production / cloud tanpa perlu upload file manual)
+      let fileSession: GoPaySession | null = null;
+      let envSession: GoPaySession | null = null;
+
+      // 1. Cek lokasi file di disk terlebih dahulu (selalu diperbarui oleh auto-refresh server)
+      const targetPath = this.resolveSessionFilePath();
+      if (fs.existsSync(targetPath)) {
+        try {
+          const raw = fs.readFileSync(targetPath, "utf-8");
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.access_token) {
+            fileSession = parsed;
+            this.sessionFilePath = targetPath;
+          }
+        } catch (fileErr: any) {
+          console.warn("⚠️ Gagal membaca berkas sesi GoPay dari disk:", fileErr.message);
+        }
+      }
+
+      // 2. Dukung pembacaan sesi dari Environment Variable GOPAY_SESSION_JSON
       if (process.env.GOPAY_SESSION_JSON) {
         try {
-          const session = JSON.parse(process.env.GOPAY_SESSION_JSON);
-          if (session && session.access_token) {
-            return session;
+          const parsed = JSON.parse(process.env.GOPAY_SESSION_JSON);
+          if (parsed && parsed.access_token) {
+            envSession = parsed;
           }
         } catch (envJsonErr: any) {
           console.warn("⚠️ [GoPay] GOPAY_SESSION_JSON pada .env tidak berformat JSON valid:", envJsonErr.message);
         }
       }
 
-      // 2. Cek lokasi file di disk
-      const targetPath = this.resolveSessionFilePath();
-      if (!fs.existsSync(targetPath)) {
-        return null;
+      // 3. Prioritaskan sesi paling mutakhir
+      if (fileSession && envSession) {
+        const fileTime = fileSession.updated_at ? new Date(fileSession.updated_at).getTime() : 0;
+        const envTime = envSession.updated_at ? new Date(envSession.updated_at).getTime() : 0;
+        return fileTime >= envTime ? fileSession : envSession;
       }
-      const raw = fs.readFileSync(targetPath, "utf-8");
-      const session = JSON.parse(raw);
-      if (!session || !session.access_token) {
-        return null;
-      }
-      this.sessionFilePath = targetPath;
-      return session;
+
+      return fileSession || envSession || null;
     } catch (err: any) {
       console.warn("⚠️ Gagal membaca berkas sesi GoPay:", err.message);
       return null;
@@ -120,6 +133,10 @@ class GopayService {
         mode: 0o600, // Secure file permissions (owner read/write only)
       });
       this.sessionFilePath = targetPath;
+
+      // Sinkronkan memori runtime agar tidak tertimpa string lama di process.env
+      process.env.GOPAY_SESSION_JSON = JSON.stringify(session);
+
       console.log("✅ Sesi GoPay Merchant berhasil disimpan ke:", targetPath);
     } catch (err: any) {
       console.error("❌ Gagal menyimpan sesi GoPay:", err.message);
