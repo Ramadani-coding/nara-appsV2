@@ -216,12 +216,16 @@ export default function Checkout() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'vouchers' },
         (payload) => {
-          console.log('⚡ [Realtime Checkout] Update voucher dari Supabase:', payload.eventType);
+          if (import.meta.env.DEV) {
+            console.log('⚡ [Realtime Checkout] Update voucher dari Supabase:', payload.eventType);
+          }
           syncVouchers(true);
         }
       )
       .subscribe((status) => {
-        console.log('⚡ [Realtime Checkout] WebSocket status:', status);
+        if (import.meta.env.DEV) {
+          console.log('⚡ [Realtime Checkout] WebSocket status:', status);
+        }
       });
 
     // 3. BroadcastChannel (Sinkronisasi seketika antar-tab browser lokal <10ms)
@@ -231,7 +235,9 @@ export default function Checkout() {
         bc = new BroadcastChannel('nara_voucher_sync');
         bc.onmessage = (event) => {
           if (event.data?.type === 'VOUCHER_CHANGED') {
-            console.log('⚡ [Realtime Checkout] Broadcast sync diterima');
+            if (import.meta.env.DEV) {
+              console.log('⚡ [Realtime Checkout] Broadcast sync diterima');
+            }
             syncVouchers(true);
           }
         };

@@ -49,20 +49,44 @@ export function usePremkuBalance() {
       const data = await fetchPremkuBalance();
       setBalanceData(data);
     } catch (err) {
-      console.warn('Gagal memuat saldo premku:', err);
+      if (import.meta.env.DEV) {
+        console.warn('Gagal memuat saldo premku:', err);
+      }
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    refreshBalance();
+    let isSubscribed = true;
+    let timer: any = null;
 
-    const timer = setInterval(() => {
-      refreshBalance();
-    }, 60000);
+    const init = async () => {
+      try {
+        const { supabase } = await import('./supabaseClient');
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!isSubscribed) return;
 
-    return () => clearInterval(timer);
+        // Hanya fetch & polling jika ada sesi login admin aktif
+        if (session?.access_token) {
+          refreshBalance();
+          timer = setInterval(() => {
+            refreshBalance();
+          }, 60000);
+        } else {
+          setLoading(false);
+        }
+      } catch {
+        if (isSubscribed) setLoading(false);
+      }
+    };
+
+    init();
+
+    return () => {
+      isSubscribed = false;
+      if (timer) clearInterval(timer);
+    };
   }, [refreshBalance]);
 
   const saldo = balanceData.saldo;
@@ -73,6 +97,8 @@ export function usePremkuBalance() {
    */
   const isMaintenance = useCallback((modalPrice: number): boolean => {
     if (modalPrice <= 0) return false;
+    // Jika tidak ada saldo admin (pengunjung publik), jangan flag maintenance secara prematur
+    if (saldo <= 0) return false;
     return saldo < modalPrice;
   }, [saldo]);
 
@@ -82,7 +108,7 @@ export function usePremkuBalance() {
    */
   const getMaxAllowedQty = useCallback((modalPrice: number, stockCount: number): number => {
     if (modalPrice <= 0) return Math.max(0, stockCount);
-    if (saldo < modalPrice) return 0;
+    if (saldo <= 0) return Math.max(0, stockCount);
     const maxByBalance = Math.floor(saldo / modalPrice);
     return Math.max(0, Math.min(stockCount, maxByBalance));
   }, [saldo]);

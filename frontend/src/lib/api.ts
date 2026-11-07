@@ -111,6 +111,18 @@ export interface PremkuBalanceData {
  */
 export async function fetchPremkuBalance(): Promise<PremkuBalanceData> {
   try {
+    const { supabase } = await import("./supabaseClient");
+    const { data: { session } } = await supabase.auth.getSession();
+
+    // Jika bukan admin yang sedang login, jangan request endpoint admin /premku/balance
+    if (!session?.access_token) {
+      const cached = localStorage.getItem('nara_premku_saldo');
+      return {
+        saldo: cached ? parseInt(cached, 10) || 0 : 0,
+        cached: true,
+      };
+    }
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 6000);
 

@@ -436,7 +436,9 @@ class CatalogStore {
           }
         )
         .subscribe((status) => {
-          console.log('⚡ Supabase Realtime catalog status:', status);
+          if (import.meta.env.DEV) {
+            console.log('⚡ Supabase Realtime catalog status:', status);
+          }
         });
     } catch (err) {
       console.warn('Realtime subscription error:', err);
