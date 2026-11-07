@@ -103,7 +103,7 @@ export default function Home() {
               </div>
 
               <div className="p-3 sm:p-4 bg-white dark:bg-[#1E2333] border-2 border-black dark:border-gray-700 shadow-[3px_3px_0px_#000] rounded-xl">
-                <div className="text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400">24/7</div>
+                <div className="text-2xl sm:text-3xl font-black text-emerald-700 dark:text-emerald-400">24/7</div>
                 <div className="text-[10px] sm:text-xs font-extrabold uppercase text-gray-500 dark:text-gray-400 tracking-wider">
                   SISTEM OTOMATIS
                 </div>
@@ -129,7 +129,7 @@ export default function Home() {
               </div>
               <div className="w-[1px] h-6 bg-gray-300 dark:bg-gray-700" />
               <div className="flex-1">
-                <div className="text-base font-black text-emerald-600 dark:text-emerald-400 leading-tight">24/7</div>
+                <div className="text-base font-black text-emerald-700 dark:text-emerald-400 leading-tight">24/7</div>
                 <div className="text-[9px] font-extrabold uppercase text-gray-500 dark:text-gray-400">
                   Otomatis
                 </div>
@@ -162,7 +162,7 @@ export default function Home() {
               <ShieldCheck className="w-6 h-6 text-black" />
             </div>
             <div>
-              <h4 className="font-black text-sm text-black">Pembayaran Aman</h4>
+              <h3 className="font-black text-sm text-black">Pembayaran Aman</h3>
               <p className="text-xs text-gray-600 font-medium">Proses order terstruktur</p>
             </div>
           </div>
@@ -172,7 +172,7 @@ export default function Home() {
               <Zap className="w-6 h-6 text-black" />
             </div>
             <div>
-              <h4 className="font-black text-sm text-black">Proses Cepat</h4>
+              <h3 className="font-black text-sm text-black">Proses Cepat</h3>
               <p className="text-xs text-gray-600 font-medium">Order langsung diproses</p>
             </div>
           </div>
@@ -182,7 +182,7 @@ export default function Home() {
               <Star className="w-6 h-6 text-black" />
             </div>
             <div>
-              <h4 className="font-black text-sm text-black">Garansi</h4>
+              <h3 className="font-black text-sm text-black">Garansi</h3>
               <p className="text-xs text-gray-600 font-medium">Sesuai ketentuan produk</p>
             </div>
           </div>
@@ -192,7 +192,7 @@ export default function Home() {
               <MessageCircle className="w-6 h-6 text-black" />
             </div>
             <div>
-              <h4 className="font-black text-sm text-black">Customer Support</h4>
+              <h3 className="font-black text-sm text-black">Customer Support</h3>
               <p className="text-xs text-gray-600 font-medium">Hubungi admin melalui WhatsApp</p>
             </div>
           </div>
@@ -281,7 +281,7 @@ export default function Home() {
                       service.badgeColor === 'pink'
                         ? 'bg-brand-pink-soft text-brand-pink'
                         : service.badgeColor === 'emerald'
-                        ? 'bg-emerald-100 text-emerald-700'
+                        ? 'bg-emerald-100 text-emerald-800'
                         : 'bg-blue-100 text-brand-blue'
                     }`}>
                       {service.badge}

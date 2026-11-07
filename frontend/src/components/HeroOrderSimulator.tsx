@@ -367,7 +367,7 @@ export const HeroOrderSimulator: React.FC<HeroOrderSimulatorProps> = ({
                     <span className="text-[10px] sm:text-xs font-black uppercase text-black dark:text-white">
                       Kredensial Akun:
                     </span>
-                    <span className="text-[9px] sm:text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                    <span className="text-[9px] sm:text-[10px] font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
                       <ShieldCheck className="w-3 h-3" /> Garansi 30 Hari
                     </span>
                   </div>

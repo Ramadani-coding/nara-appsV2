@@ -77,6 +77,8 @@ Desktop.ini
 tmp/
 temp/
 scratch/
+perf.json
+lighthouse*.json
 
 # ---------------------------------------------------
 # 7. Graphify Local Caches

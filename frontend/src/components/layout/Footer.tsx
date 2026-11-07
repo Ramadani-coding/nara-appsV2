@@ -58,6 +58,10 @@ export function Footer() {
               <img 
                 src="/nara-logov2.png" 
                 alt="Nara Premium Logo" 
+                width="36"
+                height="36"
+                loading="lazy"
+                decoding="async"
                 className="w-9 h-9 rounded-xl border-2 border-black dark:border-gray-700 shadow-[2px_2px_0px_#000] shrink-0 object-contain bg-white" 
               />
               <span className="text-2xl font-black tracking-tight text-black dark:text-white">

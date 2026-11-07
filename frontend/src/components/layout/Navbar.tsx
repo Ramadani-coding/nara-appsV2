@@ -54,6 +54,8 @@ export function Navbar() {
               <img 
                 src="/nara-logov2.png" 
                 alt="Nara Premium Logo" 
+                width="40"
+                height="40"
                 className="w-10 h-10 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] object-contain group-hover:scale-105 transition-transform bg-white shrink-0" 
               />
               <div className="flex items-center font-extrabold text-xl tracking-tight text-black">

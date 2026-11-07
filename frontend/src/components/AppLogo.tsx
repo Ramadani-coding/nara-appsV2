@@ -13,6 +13,8 @@ export function AppLogo({ id, className = "w-16 h-16", imageUrl }: AppLogoProps)
           alt={id} 
           loading="lazy"
           decoding="async"
+          width="80"
+          height="80"
           className="w-full h-full object-contain" 
           onError={(e) => {
             (e.target as HTMLElement).style.display = 'none';
