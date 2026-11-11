@@ -18,6 +18,8 @@ frontend/.env
 .gopay_session.json
 backend/.gopay_session.json
 .GOPAY_SESI_JANGAN_DIHAPUS.json
+.stb_ip
+*.tar.gz
 
 # Pengecualian: Pastikan template contoh (.env.example) tetap ter-upload
 !.env.example

@@ -136,7 +136,7 @@ export class PremiumkuService {
           "User-Agent": "NaraStore/1.0",
         },
         body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(25000),
       });
 
       if (!res.ok) {
@@ -171,7 +171,7 @@ export class PremiumkuService {
           api_key: this.apiKey,
           product_id: productId,
         }),
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(20000),
       });
 
       return (await res.json()) as PremiumkuStockResponse;
@@ -199,7 +199,7 @@ export class PremiumkuService {
           qty: params.qty,
           ref_id: params.refId,
         }),
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(35000),
       });
 
       const rawData = (await res.json()) as PremiumkuOrderResponse;
@@ -212,7 +212,7 @@ export class PremiumkuService {
 
       return rawData;
     } catch (error: any) {
-      console.error(`❌ Error creating order for ref_id ${params.refId}:`, error.message);
+      console.error(`❌ Error creating order for ref_id ${params.refId}:`, error.message, error.cause || "");
       throw error;
     }
   }
@@ -233,7 +233,7 @@ export class PremiumkuService {
           api_key: this.apiKey,
           invoice: invoice,
         }),
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(25000),
       });
 
       return (await res.json()) as PremiumkuOrderStatusResponse;
@@ -258,7 +258,7 @@ export class PremiumkuService {
         body: JSON.stringify({
           api_key: this.apiKey,
         }),
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(25000),
       });
 
       return (await res.json()) as PremiumkuProfileResponse;

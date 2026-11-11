@@ -1,3 +1,6 @@
+import dns from "node:dns";
+dns.setDefaultResultOrder("ipv4first");
+
 import { app } from "./app.js";
 import { startAutoSyncWorker, stopAutoSyncWorker } from "./workers/autoSyncWorker.js";
 import { startOrderQueueWorker, stopOrderQueueWorker } from "./workers/orderQueueWorker.js";
